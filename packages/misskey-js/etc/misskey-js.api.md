@@ -288,10 +288,19 @@ type AdminQueueInboxDelayedResponse = operations['admin___queue___inbox-delayed'
 type AdminQueueJobsRequest = operations['admin___queue___jobs']['requestBody']['content']['application/json'];
 
 // @public (undocumented)
+type AdminQueueJobsResponse = operations['admin___queue___jobs']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
 type AdminQueuePromoteJobsRequest = operations['admin___queue___promote-jobs']['requestBody']['content']['application/json'];
 
 // @public (undocumented)
+type AdminQueueQueuesResponse = operations['admin___queue___queues']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
 type AdminQueueQueueStatsRequest = operations['admin___queue___queue-stats']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type AdminQueueQueueStatsResponse = operations['admin___queue___queue-stats']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
 type AdminQueueRemoveJobRequest = operations['admin___queue___remove-job']['requestBody']['content']['application/json'];
@@ -301,6 +310,9 @@ type AdminQueueRetryJobRequest = operations['admin___queue___retry-job']['reques
 
 // @public (undocumented)
 type AdminQueueShowJobRequest = operations['admin___queue___show-job']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type AdminQueueShowJobResponse = operations['admin___queue___show-job']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
 type AdminQueueStatsResponse = operations['admin___queue___stats']['responses']['200']['content']['application/json'];
@@ -1297,6 +1309,9 @@ type DriveFilesFindRequest = operations['drive___files___find']['requestBody']['
 type DriveFilesFindResponse = operations['drive___files___find']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
+type DriveFilesMoveBulkRequest = operations['drive___files___move-bulk']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
 type DriveFilesRequest = operations['drive___files']['requestBody']['content']['application/json'];
 
 // @public (undocumented)
@@ -1582,11 +1597,15 @@ declare namespace entities {
         AdminQueueDeliverDelayedResponse,
         AdminQueueInboxDelayedResponse,
         AdminQueueJobsRequest,
+        AdminQueueJobsResponse,
         AdminQueuePromoteJobsRequest,
         AdminQueueQueueStatsRequest,
+        AdminQueueQueueStatsResponse,
+        AdminQueueQueuesResponse,
         AdminQueueRemoveJobRequest,
         AdminQueueRetryJobRequest,
         AdminQueueShowJobRequest,
+        AdminQueueShowJobResponse,
         AdminQueueStatsResponse,
         AdminRejectQuotesRequest,
         AdminRelaysAddRequest,
@@ -1792,6 +1811,7 @@ declare namespace entities {
         DriveFilesFindResponse,
         DriveFilesFindByHashRequest,
         DriveFilesFindByHashResponse,
+        DriveFilesMoveBulkRequest,
         DriveFilesShowRequest,
         DriveFilesShowResponse,
         DriveFilesUpdateRequest,
@@ -2036,6 +2056,8 @@ declare namespace entities {
         NotesSearchByTagResponse,
         NotesShowRequest,
         NotesShowResponse,
+        NotesShowPartialBulkRequest,
+        NotesShowPartialBulkResponse,
         NotesStateRequest,
         NotesStateResponse,
         NotesThreadMutingCreateRequest,
@@ -2189,6 +2211,8 @@ declare namespace entities {
         PageBlock,
         Channel,
         QueueCount,
+        QueueMetrics,
+        QueueJob,
         Antenna,
         Clip,
         FederationInstance,
@@ -3257,6 +3281,12 @@ type NotesSearchRequest = operations['notes___search']['requestBody']['content']
 type NotesSearchResponse = operations['notes___search']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
+type NotesShowPartialBulkRequest = operations['notes___show-partial-bulk']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type NotesShowPartialBulkResponse = operations['notes___show-partial-bulk']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
 type NotesShowRequest = operations['notes___show']['requestBody']['content']['application/json'];
 
 // @public (undocumented)
@@ -3398,6 +3428,12 @@ type PureRenote = Omit<Note, 'renote' | 'renoteId' | 'reply' | 'replyId' | 'text
 type QueueCount = components['schemas']['QueueCount'];
 
 // @public (undocumented)
+type QueueJob = components['schemas']['QueueJob'];
+
+// @public (undocumented)
+type QueueMetrics = components['schemas']['QueueMetrics'];
+
+// @public (undocumented)
 type QueueStats = {
     deliver: {
         activeSincePrevTick: number;
@@ -3415,6 +3451,9 @@ type QueueStats = {
 
 // @public (undocumented)
 type QueueStatsLog = QueueStats[];
+
+// @public (undocumented)
+export const queueTypes: readonly ["system", "endedPollNotification", "deliver", "inbox", "db", "relationship", "objectStorage", "userWebhookDeliver", "systemWebhookDeliver"];
 
 // @public (undocumented)
 type RenoteMuteCreateRequest = operations['renote-mute___create']['requestBody']['content']['application/json'];

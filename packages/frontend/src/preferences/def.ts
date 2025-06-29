@@ -5,6 +5,7 @@
 
 import * as Misskey from 'misskey-js';
 import { hemisphere } from '@@/js/intl-const.js';
+import { v4 as uuid } from 'uuid';
 import type { Theme } from '@/theme.js';
 import type { SoundType } from '@/utility/sound.js';
 import type { Plugin } from '@/plugin.js';
@@ -16,6 +17,7 @@ import { DEFAULT_DEVICE_KIND } from '@/utility/device-kind.js';
 import { searchEngineMap } from '@/utility/search-engine-map.js';
 import { defaultFollowingFeedState } from '@/types/following-feed.js';
 import { miLocalStorage } from '@/local-storage';
+import { deepEqual } from '@/utility/deep-equal.js';
 
 /** サウンド設定 */
 export type SoundStore = {
@@ -53,15 +55,15 @@ export const PREF_DEF = {
 	},
 	widgets: {
 		accountDependent: true,
-		default: [{
+		default: () => [{
 			name: 'calendar',
-			id: 'a', place: 'right', data: {},
+			id: uuid(), place: 'right', data: {},
 		}, {
 			name: 'notifications',
-			id: 'b', place: 'right', data: {},
+			id: uuid(), place: 'right', data: {},
 		}, {
 			name: 'trends',
-			id: 'c', place: 'right', data: {},
+			id: uuid(), place: 'right', data: {},
 		}] as {
 			name: string;
 			id: string;
@@ -80,8 +82,8 @@ export const PREF_DEF = {
 
 	emojiPalettes: {
 		serverDependent: true,
-		default: [{
-			id: 'a',
+		default: () => [{
+			id: uuid(),
 			name: '',
 			emojis: ['👍', '❤️', '😆', '🤔', '😮', '🎉', '💢', '😥', '😇', '🍮'],
 		}] as {
@@ -89,6 +91,22 @@ export const PREF_DEF = {
 			name: string;
 			emojis: string[];
 		}[],
+		mergeStrategy: (a, b) => {
+			const mergedItems = [] as (typeof a)[];
+			for (const x of a.concat(b)) {
+				const sameIdItem = mergedItems.find(y => y.id === x.id);
+				if (sameIdItem != null) {
+					if (deepEqual(x, sameIdItem)) { // 完全な重複は無視
+						continue;
+					} else { // IDは同じなのに内容が違う場合はマージ不可とする
+						throw new Error();
+					}
+				} else {
+					mergedItems.push(x);
+				}
+			}
+			return mergedItems;
+		},
 	},
 	emojiPaletteForReaction: {
 		serverDependent: true,
@@ -104,6 +122,22 @@ export const PREF_DEF = {
 	},
 	themes: {
 		default: [] as Theme[],
+		mergeStrategy: (a, b) => {
+			const mergedItems = [] as (typeof a)[];
+			for (const x of a.concat(b)) {
+				const sameIdItem = mergedItems.find(y => y.id === x.id);
+				if (sameIdItem != null) {
+					if (deepEqual(x, sameIdItem)) { // 完全な重複は無視
+						continue;
+					} else { // IDは同じなのに内容が違う場合はマージ不可とする
+						throw new Error();
+					}
+				} else {
+					mergedItems.push(x);
+				}
+			}
+			return mergedItems;
+		},
 	},
 	lightTheme: {
 		default: null as Theme | null,
@@ -204,6 +238,9 @@ export const PREF_DEF = {
 	useStickyIcons: {
 		default: true,
 	},
+	enableHighQualityImagePlaceholders: {
+		default: true,
+	},
 	showFixedPostForm: {
 		default: false,
 	},
@@ -214,9 +251,6 @@ export const PREF_DEF = {
 		default: true,
 	},
 	useReactionPickerForContextMenu: {
-		default: false,
-	},
-	showGapBetweenNotesInTimeline: {
 		default: false,
 	},
 	instanceTicker: {
@@ -242,6 +276,12 @@ export const PREF_DEF = {
 	},
 	numberOfPageCache: {
 		default: 3,
+	},
+	pollingInterval: {
+		// 1 ... 低
+		// 2 ... 中
+		// 3 ... 高
+		default: 2,
 	},
 	showNoteActionsOnlyHover: {
 		default: false,
@@ -282,9 +322,6 @@ export const PREF_DEF = {
 	keepScreenOn: {
 		default: false,
 	},
-	disableStreamingTimeline: {
-		default: false,
-	},
 	useGroupedNotifications: {
 		default: true,
 	},
@@ -292,9 +329,10 @@ export const PREF_DEF = {
 		default: {
 			media: false,
 			avatar: false,
-			urlPreview: false,
+			urlPreviewThumbnail: false,
+			disableUrlPreview: false,
 			code: false,
-		} as Record<string, boolean>,
+		} satisfies Record<string, boolean>,
 	},
 	hemisphere: {
 		default: hemisphere as 'N' | 'S',
@@ -346,6 +384,19 @@ export const PREF_DEF = {
 	},
 	plugins: {
 		default: [] as Plugin[],
+		mergeStrategy: (a, b) => {
+			const sameIdExists = a.some(x => b.some(y => x.installId === y.installId));
+			if (sameIdExists) throw new Error();
+			const sameNameExists = a.some(x => b.some(y => x.name === y.name));
+			if (sameNameExists) throw new Error();
+			return a.concat(b);
+		},
+	},
+	mutingEmojis: {
+		default: [] as string[],
+		mergeStrategy: (a, b) => {
+			return [...new Set(a.concat(b))];
+		},
 	},
 
 	'sound.masterVolume': {
@@ -413,6 +464,10 @@ export const PREF_DEF = {
 	},
 
 	'experimental.stackingRouterView': {
+		default: false,
+	},
+
+	'experimental.enableFolderPageView': {
 		default: false,
 	},
 

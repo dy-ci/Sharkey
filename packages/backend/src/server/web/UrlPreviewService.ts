@@ -316,7 +316,7 @@ export class UrlPreviewService {
 			: undefined;
 
 		return summaly(url, {
-			followRedirects: true,
+			followRedirects: this.meta.urlPreviewAllowRedirect,
 			lang: lang ?? 'ja-JP',
 			agent: agent,
 			userAgent: meta.urlPreviewUserAgent ?? undefined,
@@ -333,6 +333,7 @@ export class UrlPreviewService {
 			followRedirects: true,
 			url: url,
 			lang: lang ?? 'ja-JP',
+			followRedirects: this.meta.urlPreviewAllowRedirect,
 			userAgent: meta.urlPreviewUserAgent ?? undefined,
 			operationTimeout: meta.urlPreviewTimeout,
 			contentLengthLimit: meta.urlPreviewMaximumContentLength,

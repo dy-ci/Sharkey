@@ -93,6 +93,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 					// A renote can't mention a user, so it will never appear here anyway.
 					//this.queryService.generateMutedUserRenotesQueryForNotes(qb, me);
 
+					// TODO DAKKAR fix after merge
+					this.queryService.generateBaseNoteFilteringQuery(query, me);
+
 					if (ps.visibility) {
 						qb.andWhere('note.visibility = :visibility', { visibility: ps.visibility });
 					}

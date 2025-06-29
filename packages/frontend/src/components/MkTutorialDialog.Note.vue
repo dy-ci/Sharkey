@@ -87,8 +87,6 @@ const onceReacted = ref<boolean>(false);
 function addReaction(emoji) {
 	onceReacted.value = true;
 	emit('reacted');
-	exampleNote.reactions[emoji] = 1;
-	exampleNote.myReaction = emoji;
 	doNotification(emoji);
 }
 

@@ -374,18 +374,12 @@ proxyBypassHosts:
 # * Perform image compression (on a different server resource than the main process)
 #mediaProxy: https://example.com/proxy
 
-# Proxy remote files (default: true)
-# Proxy remote files by this instance or mediaProxy to prevent remote files from running in remote domains.
-proxyRemoteFiles: true
-
 # Movie Thumbnail Generation URL
 # There is no reference implementation.
 # For example, Sharkey will point to the following URL:
 #   https://example.com/thumbnail.webp?thumbnail=1&url=https%3A%2F%2Fstorage.example.com%2Fpath%2Fto%2Fvideo.mp4
 #videoThumbnailGenerator: https://example.com
 
-# Sign outgoing ActivityPub GET request (default: true)
-signToActivityPubGet: true
 # Sign outgoing ActivityPub Activities (default: true)
 # Linked Data signatures are cryptographic signatures attached to each activity to provide proof of authenticity.
 # When using authorized fetch, this is often undesired as any signed activity can be forwarded to a blocked instance by relays and other instances.
@@ -415,11 +409,6 @@ attachLdSignatureForRelays: true
 #      - 443
 
 #customMOTD: ['Hello World', 'The sharks rule all', 'Shonks']
-
-# Disable automatic redirect for ActivityPub object lookup. (default: false)
-# This is a strong defense against potential impersonation attacks if the viewer instance has inadequate validation.
-# However it will make it impossible for other instances to lookup third-party user and notes through your URL.
-#disallowExternalApRedirect: true
 
 # Upload or download file size limits (bytes)
 #maxFileSize: 262144000

@@ -86,7 +86,7 @@ const storageProvider: StorageProvider = {
 		});
 	},
 
-	cloudGets: async (ctx) => {
+	cloudGetBulk: async (ctx) => {
 		/* this happens when the frontend boots and there's no logged-in
 			 user; we can't call `i/registry/get-all` because that would
 			 fail, but also we don't need to: return the empty result that

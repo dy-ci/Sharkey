@@ -37,29 +37,45 @@ export const meta = {
 } as const;
 
 export const paramDef = {
-	type: 'object',
-	properties: {
-		id: { type: 'string', format: 'misskey:id' },
-		name: { type: 'string', pattern: '^[\\p{Letter}\\p{Number}\\p{Mark}_+-]+$' },
-		fileId: { type: 'string', format: 'misskey:id' },
-		category: {
-			type: 'string',
-			nullable: true,
-			description: 'Use `null` to reset the category.',
+	allOf: [
+		{
+			anyOf: [
+				{
+					type: 'object',
+					properties: {
+						id: { type: 'string', format: 'misskey:id' },
+					},
+					required: ['id'],
+				},
+				{
+					type: 'object',
+					properties: {
+						name: { type: 'string', pattern: '^[\\p{Letter}\\p{Number}\\p{Mark}_+-]+$' },
+					},
+					required: ['name'],
+				},
+			],
 		},
-		aliases: { type: 'array', items: {
-			type: 'string',
-		} },
-		license: { type: 'string', nullable: true },
-		isSensitive: { type: 'boolean' },
-		localOnly: { type: 'boolean' },
-		roleIdsThatCanBeUsedThisEmojiAsReaction: { type: 'array', items: {
-			type: 'string',
-		} },
-	},
-	anyOf: [
-		{ required: ['id'] },
-		{ required: ['name'] },
+		{
+			type: 'object',
+			properties: {
+				fileId: { type: 'string', format: 'misskey:id' },
+				category: {
+					type: 'string',
+					nullable: true,
+					description: 'Use `null` to reset the category.',
+				},
+				aliases: { type: 'array', items: {
+					type: 'string',
+				} },
+				license: { type: 'string', nullable: true },
+				isSensitive: { type: 'boolean' },
+				localOnly: { type: 'boolean' },
+				roleIdsThatCanBeUsedThisEmojiAsReaction: { type: 'array', items: {
+					type: 'string',
+				} },
+			},
+		},
 	],
 } as const;
 
@@ -79,10 +95,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				if (driveFile == null) throw new ApiError(meta.errors.noSuchFile);
 			}
 
-			// JSON schemeのanyOfの型変換がうまくいっていないらしい
-			const required = { id: ps.id, name: nameNfc } as
-				| { id: MiEmoji['id']; name?: string }
-				| { id?: MiEmoji['id']; name: string };
+			const required = 'id' in ps
+				? { id: ps.id, name: 'name' in ps ? nameNfc : undefined }
+				: { name: nameNfc };
 
 			const error = await this.customEmojiService.update({
 				...required,

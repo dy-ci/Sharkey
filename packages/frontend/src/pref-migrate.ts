@@ -17,7 +17,7 @@ import { miLocalStorage } from '@/local-storage';
 
 // TODO: そのうち消す
 export function migrateOldSettings() {
-	os.waiting(i18n.ts.settingsMigrating);
+	os.waiting({ text: i18n.ts.settingsMigrating });
 
 	store.loaded.then(async () => {
 		prefer.suppressReload();
@@ -99,7 +99,6 @@ export function migrateOldSettings() {
 		prefer.commit('showFixedPostFormInChannel', store.s.showFixedPostFormInChannel);
 		prefer.commit('enableInfiniteScroll', store.s.enableInfiniteScroll);
 		prefer.commit('useReactionPickerForContextMenu', store.s.useReactionPickerForContextMenu);
-		prefer.commit('showGapBetweenNotesInTimeline', store.s.showGapBetweenNotesInTimeline);
 		prefer.commit('instanceTicker', store.s.instanceTicker);
 		prefer.commit('emojiPickerScale', store.s.emojiPickerScale);
 		prefer.commit('emojiPickerWidth', store.s.emojiPickerWidth);
@@ -121,7 +120,6 @@ export function migrateOldSettings() {
 		prefer.commit('notificationStackAxis', store.s.notificationStackAxis);
 		prefer.commit('enableCondensedLine', store.s.enableCondensedLine);
 		prefer.commit('keepScreenOn', store.s.keepScreenOn);
-		prefer.commit('disableStreamingTimeline', store.s.disableStreamingTimeline);
 		prefer.commit('useGroupedNotifications', store.s.useGroupedNotifications);
 		prefer.commit('dataSaver', store.s.dataSaver);
 		prefer.commit('enableSeasonalScreenEffect', store.s.enableSeasonalScreenEffect);

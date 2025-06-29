@@ -30,8 +30,6 @@ if (providedAt > cachedAt) {
 
 export const instance: Misskey.entities.MetaDetailed = reactive(cachedMeta ?? {});
 
-export const isEnabledUrlPreview = computed(() => instance.enableUrlPreview ?? true);
-
 export const policies = computed<Misskey.entities.RolePolicies>(() => $i?.policies ?? instance.policies);
 
 export async function fetchInstance(force = false): Promise<Misskey.entities.MetaDetailed> {

@@ -105,7 +105,6 @@ async function buildBackendStyle() {
 async function build() {
   await Promise.all([
     copyFrontendFonts(),
-    copyFrontendTablerIcons(),
     copyFrontendLocales(),
     copyBackendViews(),
     buildBackendScript(),

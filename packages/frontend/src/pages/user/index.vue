@@ -6,10 +6,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 <template>
 <PageWithHeader v-model:tab="tab" :displayBackButton="true" :tabs="headerTabs" :actions="headerActions" :swipable="isTouchUsing" :page="'user'">
 	<div v-if="user">
-		<XHome v-if="tab === 'home'" :user="user" @unfoldFiles="() => { tab = 'files'; }"/>
-		<div v-else-if="tab === 'notes'" class="_spacer" style="--MI_SPACER-w: 800px;">
-			<XTimeline :user="user"/>
-		</div>
+		<XHome v-if="tab === 'home'" :user="user" @showMoreFiles="() => { tab = 'files'; }"/>
+		<XNotes v-else-if="tab === 'notes'" :user="user"/>
 		<XFiles v-else-if="tab === 'files'" :user="user"/>
 		<XActivity v-else-if="tab === 'activity'" :user="user"/>
 		<XAchievements v-else-if="tab === 'achievements'" :user="user"/>
@@ -38,7 +36,7 @@ import { serverContext, assertServerContext } from '@/server-context.js';
 import { isTouchUsing } from '@/utility/touch.js';
 
 const XHome = defineAsyncComponent(() => import('./home.vue'));
-const XTimeline = defineAsyncComponent(() => import('./index.timeline.vue'));
+const XNotes = defineAsyncComponent(() => import('./notes.vue'));
 const XFiles = defineAsyncComponent(() => import('./files.vue'));
 const XActivity = defineAsyncComponent(() => import('./activity.vue'));
 const XAchievements = defineAsyncComponent(() => import('./achievements.vue'));

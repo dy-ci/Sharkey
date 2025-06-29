@@ -171,6 +171,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		} else if (me) {
 			this.queryService.generateMutedUserRenotesQueryForNotes(query, me);
 		}
+
+		// TODO DAKKAR fix after merge
+		// this.queryService.generateBaseNoteFilteringQuery(query, me);
 		//#endregion
 
 		return await query.getMany();

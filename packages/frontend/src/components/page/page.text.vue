@@ -14,7 +14,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 <script lang="ts" setup>
 import * as Misskey from 'misskey-js';
-import { isEnabledUrlPreview } from '@/instance.js';
+import { isEnabledUrlPreview } from '@/utility/url-preview.js';
 import SkUrlPreviewGroup from '@/components/SkUrlPreviewGroup.vue';
 
 defineProps<{

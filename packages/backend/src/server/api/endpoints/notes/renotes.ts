@@ -98,6 +98,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				this.queryService.generateBlockedUserQueryForNotes(query, me);
 			}
 
+			// TODO DAKKAR fix after merge
+			this.queryService.generateBaseNoteFilteringQuery(query, me);
+
 			const renotes = await query.limit(ps.limit).getMany();
 
 			return await this.noteEntityService.packMany(renotes, me);

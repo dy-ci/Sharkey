@@ -81,20 +81,60 @@ export class QueryService {
 		return q;
 	}
 
+	/**
+	 * ミュートやブロックのようにすべてのタイムラインで共通に使用するフィルターを定義します。
+	 *
+	 * 特別な事情がない限り、各タイムラインはこの関数を呼び出してフィルターを適用してください。
+	 *
+	 * Notes for future maintainers:
+	 * 1) この関数で生成するクエリと同等の処理が FanoutTimelineEndpointService にあります。
+	 *    この関数を変更した場合、FanoutTimelineEndpointService の方も変更する必要があります。
+	 * 2) 以下のエンドポイントでは特別な事情があるため queryService のそれぞれの関数を呼び出しています。
+	 *    この関数を変更した場合、以下のエンドポイントの方も変更する必要があることがあります。
+	 *    - packages/backend/src/server/api/endpoints/clips/notes.ts
+	 */
+	@bindThis
+	public generateBaseNoteFilteringQuery(
+		query: SelectQueryBuilder<any>,
+		me: { id: MiUser['id'] } | null,
+		{
+			excludeUserFromMute,
+			excludeAuthor,
+		}: {
+			excludeUserFromMute?: MiUser['id'],
+			excludeAuthor?: boolean,
+		} = {},
+	): void {
+		// TODO DAKKAR maybe generateVisibilityQuery and generateSilencedUserQueryForNotes and generateMutedNoteThreadQuery and generateExcludedRenotesQueryForNotes ?
+		this.generateBlockedHostQueryForNote(query, excludeAuthor);
+		this.generateSuspendedUserQueryForNote(query, excludeAuthor);
+		if (me) {
+			this.generateMutedUserQueryForNotes(query, me, { excludeUserFromMute });
+			this.generateBlockedUserQueryForNotes(query, me);
+			this.generateMutedUserQueryForNotes(query, me, { noteColumn: 'renote', excludeUserFromMute });
+			this.generateBlockedUserQueryForNotes(query, me, { noteColumn: 'renote' });
+		}
+	}
+
 	// ここでいうBlockedは被Blockedの意
 	@bindThis
-	public generateBlockedUserQueryForNotes<E extends ObjectLiteral>(q: SelectQueryBuilder<E>, me: { id: MiUser['id'] }): SelectQueryBuilder<E> {
-		// 投稿の作者にブロックされていない かつ
-		// 投稿の返信先の作者にブロックされていない かつ
-		// 投稿の引用元の作者にブロックされていない
+	public generateBlockedUserQueryForNotes<E extends ObjectLiteral>(
+		q: SelectQueryBuilder<E>,
+		me: { id: MiUser['id'] },
+		{
+			noteColumn = 'note',
+		}: {
+			noteColumn?: string,
+		} = {},
+	): SelectQueryBuilder<E> {
 		return this
-			.andNotBlockingUser(q, 'note.userId', ':meId')
+			.andNotBlockingUser(q, `${noteColumn}.userId`, ':meId')
 			.andWhere(new Brackets(qb => this
-				.orNotBlockingUser(qb, 'note.replyUserId', ':meId')
-				.orWhere('note.replyUserId IS NULL')))
+				.orNotBlockingUser(qb, `${noteColumn}.replyUserId`, ':meId')
+				.orWhere(`${noteColumn}.replyUserId IS NULL`)))
 			.andWhere(new Brackets(qb => this
-				.orNotBlockingUser(qb, 'note.renoteUserId', ':meId')
-				.orWhere('note.renoteUserId IS NULL')))
+				.orNotBlockingUser(qb, `${noteColumn}.renoteUserId`, ':meId')
+				.orWhere(`${noteColumn}.renoteUserId IS NULL`)))
 			.setParameters({ meId: me.id });
 	}
 
@@ -116,29 +156,39 @@ export class QueryService {
 	}
 
 	@bindThis
-	public generateMutedUserQueryForNotes<E extends ObjectLiteral>(q: SelectQueryBuilder<E>, me: { id: MiUser['id'] }, exclude?: { id: MiUser['id'] }): SelectQueryBuilder<E> {
+	public generateMutedUserQueryForNotes<E extends ObjectLiteral>(
+		q: SelectQueryBuilder<E>,
+		me: { id: MiUser['id'] },
+		{
+			excludeUserFromMute,
+			noteColumn = 'note',
+		}: {
+			excludeUserFromMute?: MiUser['id'],
+			noteColumn?: string,
+		} = {},
+		}): SelectQueryBuilder<E> {
 		// 投稿の作者をミュートしていない かつ
 		// 投稿の返信先の作者をミュートしていない かつ
 		// 投稿の引用元の作者をミュートしていない
 		return this
-			.andNotMutingUser(q, ':meId', 'note.userId', exclude)
+			.andNotMutingUser(q, ':meId', `${noteColumn}.userId`, excludeUserFromMute)
 			.andWhere(new Brackets(qb => this
-				.orNotMutingUser(qb, ':meId', 'note.replyUserId', exclude)
-				.orWhere('note.replyUserId IS NULL')))
+				.orNotMutingUser(qb, ':meId', `${noteColumn}.replyUserId`, excludeUserFromMute)
+				.orWhere(`${noteColumn}.replyUserId IS NULL`)))
 			.andWhere(new Brackets(qb => this
-				.orNotMutingUser(qb, ':meId', 'note.renoteUserId', exclude)
-				.orWhere('note.renoteUserId IS NULL')))
+				.orNotMutingUser(qb, ':meId', `${noteColumn}.renoteUserId`, excludeUserFromMute)
+				.orWhere(`${noteColumn}.renoteUserId IS NULL`)))
 			// TODO exclude should also pass a host to skip these instances
 			// mute instances
 			.andWhere(new Brackets(qb => this
-				.andNotMutingInstance(qb, ':meId', 'note.userHost')
-				.orWhere('note.userHost IS NULL')))
+				.andNotMutingInstance(qb, ':meId', `${noteColumn}.userHost`)
+				.orWhere(`${noteColumn}.userHost IS NULL`)))
 			.andWhere(new Brackets(qb => this
-				.orNotMutingInstance(qb, ':meId', 'note.replyUserHost')
-				.orWhere('note.replyUserHost IS NULL')))
+				.orNotMutingInstance(qb, ':meId', `${noteColumn}.replyUserHost`)
+				.orWhere(`${noteColumn}.replyUserHost IS NULL`)))
 			.andWhere(new Brackets(qb => this
-				.orNotMutingInstance(qb, ':meId', 'note.renoteUserHost')
-				.orWhere('note.renoteUserHost IS NULL')))
+				.orNotMutingInstance(qb, ':meId', `${noteColumn}.renoteUserHost`)
+				.orWhere(`${noteColumn}.renoteUserHost IS NULL`)))
 			.setParameters({ meId: me.id });
 	}
 

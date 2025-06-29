@@ -498,6 +498,8 @@ export default function MkMfm(props: MfmProps, { emit }: { emit: SetupContext<Mf
 							normal: props.plain,
 							host: props.author.host,
 							useOriginalSize: scale >= 2.5,
+							menu: props.enableEmojiMenu,
+							menuReaction: false,
 						})];
 					}
 				}

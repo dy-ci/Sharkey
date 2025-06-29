@@ -9,6 +9,7 @@ import { NoteEntityService } from '@/core/entities/NoteEntityService.js';
 import { DI } from '@/di-symbols.js';
 import type { NotesRepository } from '@/models/_.js';
 import { QueryService } from '@/core/QueryService.js';
+import { MiMeta } from '@/models/Meta.js';
 import { ApiError } from '../../error.js';
 
 export const meta = {
@@ -57,6 +58,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		@Inject(DI.notesRepository)
 		private notesRepository: NotesRepository,
 
+		@Inject(DI.meta)
+		private serverSettings: MiMeta,
+
 		private noteEntityService: NoteEntityService,
 		private queryService: QueryService,
 	) {
@@ -77,6 +81,14 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 			}
 
 			if (note.user!.requireSigninToViewContents && me == null) {
+				throw new ApiError(meta.errors.signinRequired);
+			}
+
+			if (this.serverSettings.ugcVisibilityForVisitor === 'none' && me == null) {
+				throw new ApiError(meta.errors.signinRequired);
+			}
+
+			if (this.serverSettings.ugcVisibilityForVisitor === 'local' && note.userHost != null && me == null) {
 				throw new ApiError(meta.errors.signinRequired);
 			}
 

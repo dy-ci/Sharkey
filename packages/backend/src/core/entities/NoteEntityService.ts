@@ -678,6 +678,7 @@ export class NoteEntityService implements OnModuleInit {
 			} : undefined,
 			mentions: note.mentions.length > 0 ? note.mentions : undefined,
 			mentionHandles: note.mentions.length > 0 ? this.getUserHandles(note.mentions, options?._hint_?.mentionHandles) : undefined,
+			hasPoll: note.hasPoll || undefined,
 			uri: note.uri ?? undefined,
 			url: note.url ?? undefined,
 			poll: note.hasPoll ? this.populatePoll(note, meId, {
@@ -1044,5 +1045,43 @@ export class NoteEntityService implements OnModuleInit {
 	@bindThis
 	public genLocalNoteUri(noteId: string): string {
 		return `${this.config.url}/notes/${noteId}`;
+	}
+
+	@bindThis
+	public async fetchDiffs(noteIds: MiNote['id'][]) {
+		if (noteIds.length === 0) return [];
+
+		const notes = await this.notesRepository.find({
+			where: {
+				id: In(noteIds),
+			},
+			select: {
+				id: true,
+				userHost: true,
+				reactions: true,
+				reactionAndUserPairCache: true,
+			},
+		});
+
+		const bufferedReactionsMap = this.meta.enableReactionsBuffering ? await this.reactionsBufferingService.getMany(noteIds) : null;
+
+		const packings = notes.map(note => {
+			const bufferedReactions = bufferedReactionsMap?.get(note.id);
+			//const reactionAndUserPairCache = note.reactionAndUserPairCache.concat(bufferedReactions.pairs.map(x => x.join('/')));
+
+			const reactions = this.reactionService.convertLegacyReactions(this.reactionsBufferingService.mergeReactions(note.reactions, bufferedReactions?.deltas ?? {}));
+
+			const reactionEmojiNames = Object.keys(reactions)
+				.filter(x => x.startsWith(':') && x.includes('@') && !x.includes('@.')) // リモートカスタム絵文字のみ
+				.map(x => this.reactionService.decodeReaction(x).reaction.replaceAll(':', ''));
+
+			return this.customEmojiService.populateEmojis(reactionEmojiNames, note.userHost).then(reactionEmojis => ({
+				id: note.id,
+				reactions,
+				reactionEmojis,
+			}));
+		});
+
+		return await Promise.all(packings);
 	}
 }

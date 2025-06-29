@@ -70,6 +70,7 @@ export type RolePolicies = {
 	canImportUserLists: boolean;
 	chatAvailability: 'available' | 'readonly' | 'unavailable';
 	canTrend: boolean;
+	uploadableFileTypes: string[];
 };
 
 export const DEFAULT_POLICIES: RolePolicies = {
@@ -89,7 +90,7 @@ export const DEFAULT_POLICIES: RolePolicies = {
 	canUseTranslator: false,
 	canHideAds: false,
 	driveCapacityMb: 100,
-	maxFileSizeMb: 25,
+	maxFileSizeMb: 30,
 	alwaysMarkNsfw: false,
 	canUpdateBioMedia: true,
 	pinLimit: 5,
@@ -110,6 +111,13 @@ export const DEFAULT_POLICIES: RolePolicies = {
 	canImportUserLists: true,
 	chatAvailability: 'available',
 	canTrend: true,
+	uploadableFileTypes: [
+		'text/plain',
+		'application/json',
+		'image/*',
+		'video/*',
+		'audio/*',
+	],
 };
 
 @Injectable()
@@ -472,6 +480,16 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 			canImportUserLists: calc('canImportUserLists', vs => vs.some(v => v === true)),
 			chatAvailability: calc('chatAvailability', aggregateChatAvailability),
 			canTrend: calc('canTrend', vs => vs.some(v => v === true)),
+			uploadableFileTypes: calc('uploadableFileTypes', vs => {
+				const set = new Set<string>();
+				for (const v of vs) {
+					for (const type of v) {
+						if (type.trim() === '') continue;
+						set.add(type.trim());
+					}
+				}
+				return [...set];
+			}),
 		};
 	}
 

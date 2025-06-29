@@ -180,6 +180,9 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 		this.queryService.generateMutedUserQueryForNotes(query, me);
 		this.queryService.generateBlockedUserQueryForNotes(query, me);
 
+		// TODO dakkar fix after merge
+		// this.queryService.generateBaseNoteFilteringQuery(query, me);
+
 		if (ps.withFiles) {
 			query.andWhere('note.fileIds != \'{}\'');
 		}

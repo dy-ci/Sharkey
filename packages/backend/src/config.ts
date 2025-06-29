@@ -87,7 +87,6 @@ type Source = {
 	proxyBypassHosts?: string[];
 
 	allowedPrivateNetworks?: PrivateNetworkSource[];
-	disallowExternalApRedirect?: boolean;
 
 	maxFileSize?: number;
 	maxNoteLength?: number;
@@ -117,14 +116,11 @@ type Source = {
 
 	mediaDirectory?: string;
 	mediaProxy?: string;
-	proxyRemoteFiles?: boolean;
 	videoThumbnailGenerator?: string;
 
 	customMOTD?: string[];
 
-	signToActivityPubGet?: boolean;
 	attachLdSignatureForRelays?: boolean;
-	checkActivityPubGetSignature?: boolean;
 
 	perChannelMaxNoteCacheCount?: number;
 	perUserNotificationsMaxCount?: number;
@@ -255,7 +251,6 @@ export type Config = {
 	proxySmtp: string | undefined;
 	proxyBypassHosts: string[] | undefined;
 	allowedPrivateNetworks: PrivateNetwork[] | undefined;
-	disallowExternalApRedirect: boolean;
 	maxFileSize: number;
 	maxNoteLength: number;
 	maxRemoteNoteLength: number;
@@ -277,12 +272,8 @@ export type Config = {
 	relationshipJobPerSec: number | undefined;
 	deliverJobMaxAttempts: number | undefined;
 	inboxJobMaxAttempts: number | undefined;
-	proxyRemoteFiles: boolean | undefined;
 	customMOTD: string[] | undefined;
-	signToActivityPubGet: boolean;
 	attachLdSignatureForRelays: boolean;
-	/** @deprecated Use MiMeta.allowUnsignedFetch instead */
-	checkActivityPubGetSignature: boolean | undefined;
 	logging?: {
 		sql?: {
 			disableQueryTruncation?: boolean,
@@ -362,7 +353,7 @@ const dir = process.env.MISSKEY_CONFIG_DIR ?? `${_dirname}/../../../.config`;
 /**
  * Path of configuration file
  */
-const path = process.env.MISSKEY_CONFIG_YML
+export const path = process.env.MISSKEY_CONFIG_YML
 	? resolve(dir, process.env.MISSKEY_CONFIG_YML)
 	: process.env.NODE_ENV === 'test'
 		? resolve(dir, 'test.yml')
@@ -457,7 +448,6 @@ export function loadConfig(): Config {
 		proxySmtp: config.proxySmtp,
 		proxyBypassHosts: config.proxyBypassHosts,
 		allowedPrivateNetworks: parsePrivateNetworks(config.allowedPrivateNetworks),
-		disallowExternalApRedirect: config.disallowExternalApRedirect ?? false,
 		maxFileSize: config.maxFileSize ?? 262144000,
 		maxNoteLength: config.maxNoteLength ?? 3000,
 		maxRemoteNoteLength: config.maxRemoteNoteLength ?? 100000,
@@ -478,11 +468,8 @@ export function loadConfig(): Config {
 		relationshipJobPerSec: config.relationshipJobPerSec,
 		deliverJobMaxAttempts: config.deliverJobMaxAttempts,
 		inboxJobMaxAttempts: config.inboxJobMaxAttempts,
-		proxyRemoteFiles: config.proxyRemoteFiles,
 		customMOTD: config.customMOTD,
-		signToActivityPubGet: config.signToActivityPubGet ?? true,
 		attachLdSignatureForRelays: config.attachLdSignatureForRelays ?? true,
-		checkActivityPubGetSignature: config.checkActivityPubGetSignature,
 		mediaDirectory: config.mediaDirectory ?? resolve(_dirname, '../../../files'),
 		mediaProxy: externalMediaProxy ?? internalMediaProxy,
 		externalMediaProxyEnabled: externalMediaProxy !== null && externalMediaProxy !== internalMediaProxy,
@@ -663,10 +650,10 @@ function applyEnvOverrides(config: Source) {
 	_apply_top(['sentryForFrontend', 'vueIntegration', 'tracingOptions', 'timeout']);
 	_apply_top(['sentryForFrontend', 'browserTracingIntegration', 'routeLabel']);
 	_apply_top([['clusterLimit', 'deliverJobConcurrency', 'inboxJobConcurrency', 'relashionshipJobConcurrency', 'deliverJobPerSec', 'inboxJobPerSec', 'relashionshipJobPerSec', 'deliverJobMaxAttempts', 'inboxJobMaxAttempts']]);
-	_apply_top([['outgoingAddress', 'outgoingAddressFamily', 'proxy', 'proxySmtp', 'mediaDirectory', 'mediaProxy', 'proxyRemoteFiles', 'videoThumbnailGenerator']]);
+	_apply_top([['outgoingAddress', 'outgoingAddressFamily', 'proxy', 'proxySmtp', 'mediaDirectory', 'mediaProxy', 'videoThumbnailGenerator']]);
 	_apply_top([['maxFileSize', 'maxNoteLength', 'maxRemoteNoteLength', 'maxAltTextLength', 'maxRemoteAltTextLength', 'maxBioLength', 'maxRemoteBioLength', 'pidFile', 'filePermissionBits']]);
 	_apply_top(['import', ['downloadTimeout', 'maxFileSize']]);
-	_apply_top([['signToActivityPubGet', 'checkActivityPubGetSignature', 'setupPassword', 'disallowExternalApRedirect']]);
+	_apply_top([['setupPassword']]);
 	_apply_top(['logging', 'sql', ['disableQueryTruncation', 'enableQueryParamLogging']]);
 	_apply_top(['logging', ['verbose']]);
 	_apply_top(['activityLogging', ['enabled', 'preSave', 'maxAge']]);

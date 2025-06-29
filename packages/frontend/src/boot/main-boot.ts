@@ -81,37 +81,6 @@ export async function mainBoot() {
 		}
 	}
 
-	const stream = useStream();
-
-	let reloadDialogShowing = false;
-	stream.on('_disconnected_', async () => {
-		if (prefer.s.serverDisconnectedBehavior === 'dialog') {
-			if (reloadDialogShowing) return;
-			reloadDialogShowing = true;
-			const { canceled } = await confirm({
-				type: 'warning',
-				title: i18n.ts.disconnectedFromServer,
-				text: i18n.ts.reloadConfirm,
-			});
-			reloadDialogShowing = false;
-			if (!canceled) {
-				window.location.reload();
-			}
-		}
-	});
-
-	stream.on('emojiAdded', emojiData => {
-		addCustomEmoji(emojiData.emoji);
-	});
-
-	stream.on('emojiUpdated', emojiData => {
-		updateCustomEmojis(emojiData.emojis);
-	});
-
-	stream.on('emojiDeleted', emojiData => {
-		removeCustomEmojis(emojiData.emojis);
-	});
-
 	launchPlugins();
 
 	try {
@@ -168,8 +137,6 @@ export async function mainBoot() {
 				});
 			}
 		}
-
-		stream.on('announcementCreated', onAnnouncementCreated);
 
 		if ($i.isDeleted) {
 			alert({
@@ -356,54 +323,80 @@ export async function mainBoot() {
 
 		if ($i.hasUnreadNotification) attemptShowNotificationDot();
 
-		const main = markRaw(stream.useChannel('main', null, 'System'));
-
-		// 自分の情報が更新されたとき
-		main.on('meUpdated', i => {
-			updateCurrentAccountPartial(i);
-		});
-
-		main.on('readAllNotifications', () => {
-			setFavIconDot(false);
-
-			updateCurrentAccountPartial({
-				hasUnreadNotification: false,
-				unreadNotificationsCount: 0,
+		if (store.s.realtimeMode) {
+			const stream = useStream();
+			let reloadDialogShowing = false;
+			stream.on('_disconnected_', async () => {
+				if (prefer.s.serverDisconnectedBehavior === 'dialog') {
+					if (reloadDialogShowing) return;
+					reloadDialogShowing = true;
+					const { canceled } = await confirm({
+						type: 'warning',
+						title: i18n.ts.disconnectedFromServer,
+						text: i18n.ts.reloadConfirm,
+					});
+					reloadDialogShowing = false;
+					if (!canceled) {
+						window.location.reload();
+					}
+				}
 			});
-		});
 
-		main.on('unreadNotification', () => {
-			attemptShowNotificationDot();
-
-			const unreadNotificationsCount = ($i?.unreadNotificationsCount ?? 0) + 1;
-			updateCurrentAccountPartial({
-				hasUnreadNotification: true,
-				unreadNotificationsCount,
+			stream.on('emojiAdded', emojiData => {
+				addCustomEmoji(emojiData.emoji);
 			});
-		});
 
-		main.on('unreadAntenna', () => {
-			updateCurrentAccountPartial({ hasUnreadAntenna: true });
-			sound.playMisskeySfx('antenna');
-		});
+			stream.on('emojiUpdated', emojiData => {
+				updateCustomEmojis(emojiData.emojis);
+			});
 
-		main.on('newChatMessage', () => {
-			updateCurrentAccountPartial({ hasUnreadChatMessages: true });
-			sound.playMisskeySfx('chatMessage');
-		});
+			stream.on('emojiDeleted', emojiData => {
+				removeCustomEmojis(emojiData.emojis);
+			});
 
-		main.on('readAllAnnouncements', () => {
-			updateCurrentAccountPartial({ hasUnreadAnnouncement: false });
-		});
+			stream.on('announcementCreated', onAnnouncementCreated);
 
-		// 個人宛てお知らせが発行されたとき
-		main.on('announcementCreated', onAnnouncementCreated);
+			const main = markRaw(stream.useChannel('main', null, 'System'));
 
-		// トークンが再生成されたとき
-		// このままではMisskeyが利用できないので強制的にサインアウトさせる
-		main.on('myTokenRegenerated', () => {
-			signout();
-		});
+			// 自分の情報が更新されたとき
+			main.on('meUpdated', i => {
+				updateCurrentAccountPartial(i);
+			});
+
+			main.on('readAllNotifications', () => {
+				setFavIconDot(false);
+				updateCurrentAccountPartial({
+					hasUnreadNotification: false,
+					unreadNotificationsCount: 0,
+				});
+			});
+
+			main.on('unreadNotification', () => {
+				attemptShowNotificationDot();
+				const unreadNotificationsCount = ($i?.unreadNotificationsCount ?? 0) + 1;
+				updateCurrentAccountPartial({
+					hasUnreadNotification: true,
+					unreadNotificationsCount,
+				});
+			});
+
+			main.on('unreadAntenna', () => {
+				updateCurrentAccountPartial({ hasUnreadAntenna: true });
+				sound.playMisskeySfx('antenna');
+			});
+
+			main.on('newChatMessage', () => {
+				updateCurrentAccountPartial({ hasUnreadChatMessages: true });
+				sound.playMisskeySfx('chatMessage');
+			});
+
+			main.on('readAllAnnouncements', () => {
+				updateCurrentAccountPartial({ hasUnreadAnnouncement: false });
+			});
+
+			// 個人宛てお知らせが発行されたとき
+			main.on('announcementCreated', onAnnouncementCreated);
+		}
 	}
 
 	// shortcut

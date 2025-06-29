@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import { Inject, Injectable } from '@nestjs/common';
 import sharp from 'sharp';
 import { sharpBmp } from '@misskey-dev/sharp-read-bmp';
-import { IsNull } from 'typeorm';
+import { In, IsNull } from 'typeorm';
 import { DeleteObjectCommandInput, PutObjectCommandInput, NoSuchKey } from '@aws-sdk/client-s3';
 import { DI } from '@/di-symbols.js';
 import type { DriveFilesRepository, UsersRepository, DriveFoldersRepository, UserProfilesRepository, MiMeta } from '@/models/_.js';
@@ -492,7 +492,9 @@ export class DriveService {
 		ext = null,
 	}: AddFileArgs): Promise<MiDriveFile> {
 		const userRoleNSFW = user && (await this.roleService.getUserPolicies(user.id)).alwaysMarkNsfw;
-		const info = await this.fileInfoService.getFileInfo(path);
+		const info = await this.fileInfoService.getFileInfo(path, {
+			fileName: name,
+		});
 
 		// detect name
 		const detectedName = correctFilename(
@@ -525,16 +527,23 @@ export class DriveService {
 
 		this.registerLogger.debug(`ADD DRIVE FILE: user ${user?.id ?? 'not set'}, name ${detectedName}, tmp ${path}`);
 
-		//#region Check drive usage
+		//#region Check drive usage and mime type
 		if (user && !isLink) {
-			const usage = await this.driveFileEntityService.calcDriveUsageOf(user);
 			const isLocalUser = this.userEntityService.isLocalUser(user);
-
 			const policies = await this.roleService.getUserPolicies(user.id);
+
+			const allowedMimeTypes = policies.uploadableFileTypes;
+			const isAllowed = allowedMimeTypes.some((mimeType) => {
+				if (mimeType === '*' || mimeType === '*/*') return true;
+				if (mimeType.endsWith('/*')) return info.type.mime.startsWith(mimeType.slice(0, -1));
+				return info.type.mime === mimeType;
+			});
+			if (!isAllowed) {
+				throw new IdentifiableError('bd71c601-f9b0-4808-9137-a330647ced9b', `Unallowed file type: ${info.type.mime}`);
+			}
+
 			const driveCapacity = 1024 * 1024 * policies.driveCapacityMb;
 			const maxFileSize = 1024 * 1024 * policies.maxFileSizeMb;
-			this.registerLogger.debug('drive capacity override applied');
-			this.registerLogger.debug(`overrideCap: ${driveCapacity}bytes, usage: ${usage}bytes, u+s: ${usage + info.size}bytes`);
 
 			if (maxFileSize < info.size) {
 				if (isLocalUser) {
@@ -545,6 +554,11 @@ export class DriveService {
 					isLink = true;
 				}
 			}
+
+			const usage = await this.driveFileEntityService.calcDriveUsageOf(user);
+
+			this.registerLogger.debug('drive capacity override applied');
+			this.registerLogger.debug(`overrideCap: ${driveCapacity}bytes, usage: ${usage}bytes, u+s: ${usage + info.size}bytes`);
 
 			// If usage limit exceeded
 			// Repeat the "!isLink" check because it could be set to true by the previous block.
@@ -733,6 +747,21 @@ export class DriveService {
 		}
 
 		return fileObj;
+	}
+
+	@bindThis
+	public async moveFiles(fileIds: MiDriveFile['id'][], folderId: MiDriveFolder['id'] | null, userId: MiUser['id']) {
+		const folder = folderId ? await this.driveFoldersRepository.findOneByOrFail({
+			id: folderId,
+			userId: userId,
+		}) : null;
+
+		await this.driveFilesRepository.update({
+			id: In(fileIds),
+			userId: userId,
+		}, {
+			folderId: folder ? folder.id : null,
+		});
 	}
 
 	@bindThis

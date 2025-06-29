@@ -9,7 +9,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<MkTab v-model="tab" :class="$style.tab">
 			<option value="pinned">{{ i18n.ts.pinnedOnly }}</option>
 			<option value="featured">{{ i18n.ts.featured }}</option>
-			<option :value="null">{{ i18n.ts.notes }}</option>
+			<option value="notes">{{ i18n.ts.notes }}</option>
 			<option value="all">{{ i18n.ts.all }}</option>
 			<option value="files">{{ i18n.ts.withFiles }}</option>
 		</MkTab>
@@ -22,14 +22,14 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<DynamicNote v-for="note of user.pinnedNotes" :key="note.id" class="note" :class="$style.pinnedNote" :note="note" :pinned="true"/>
 		</div>
 	</div>
-	<MkNotes v-else :noGap="true" :pagination="pagination" :class="$style.tl"/>
+	<MkNotesTimeline v-else :key="tab" :noGap="true" :pagination="pagination" :pullToRefresh="false" :class="$style.tl"/>
 </MkStickyContainer>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed } from 'vue';
 import * as Misskey from 'misskey-js';
-import MkNotes from '@/components/MkNotes.vue';
+import MkNotesTimeline from '@/components/MkNotesTimeline.vue';
 import MkTab from '@/components/MkTab.vue';
 import { i18n } from '@/i18n.js';
 import DynamicNote from '@/components/DynamicNote.vue';
@@ -38,7 +38,7 @@ const props = defineProps<{
 	user: Misskey.entities.UserDetailed;
 }>();
 
-const tab = ref<string | null>('all');
+const tab = ref<string>('all');
 
 const pagination = computed(() => tab.value === 'featured' ? {
 	endpoint: 'users/featured-notes' as const,

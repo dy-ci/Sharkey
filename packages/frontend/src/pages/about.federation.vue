@@ -58,7 +58,7 @@ import { computed, ref } from 'vue';
 import MkInput from '@/components/MkInput.vue';
 import MkSelect from '@/components/MkSelect.vue';
 import MkPagination from '@/components/MkPagination.vue';
-import type { Paging } from '@/components/MkPagination.vue';
+import type { PagingCtx } from '@/composables/use-pagination.js';
 import MkInstanceCardMini from '@/components/MkInstanceCardMini.vue';
 import FormSplit from '@/components/form/split.vue';
 import { i18n } from '@/i18n.js';
@@ -87,7 +87,7 @@ const pagination = {
 			state.value === 'bubble' ? { bubble: true } :
 			{}),
 	})),
-} as Paging;
+} as PagingCtx;
 
 function getStatus(instance) {
 	if (instance.isSuspended) return 'Suspended';

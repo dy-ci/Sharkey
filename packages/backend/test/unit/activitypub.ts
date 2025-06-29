@@ -6,6 +6,9 @@ process.env.NODE_ENV = 'test';
 
 import * as assert from 'assert';
 import { generateKeyPair } from 'crypto';
+import * as fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 import { Test } from '@nestjs/testing';
 import { jest } from '@jest/globals';
 
@@ -15,6 +18,9 @@ import type { Config } from '@/config.js';
 import type { MiLocalUser, MiRemoteUser } from '@/models/User.js';
 import { InternalEventService } from '@/core/InternalEventService.js';
 import { CacheService } from '@/core/CacheService.js';
+import { MockResolver } from '../misc/mock-resolver.js';
+import type { IActor, IApDocument, ICollection, IObject, IPost } from '@/core/activitypub/type.js';
+import type { MiRemoteUser } from '@/models/User.js';
 import { ApImageService } from '@/core/activitypub/models/ApImageService.js';
 import { ApNoteService } from '@/core/activitypub/models/ApNoteService.js';
 import { ApPersonService } from '@/core/activitypub/models/ApPersonService.js';
@@ -32,9 +38,11 @@ import { secureRndstr } from '@/misc/secure-rndstr.js';
 import { DownloadService } from '@/core/DownloadService.js';
 import { genAidx } from '@/misc/id/aidx.js';
 import { IdService } from '@/core/IdService.js';
-import { MockResolver } from '../misc/mock-resolver.js';
 import { UserKeypairService } from '@/core/UserKeypairService.js';
 import { MemoryKVCache } from '@/misc/cache.js';
+
+const _filename = fileURLToPath(import.meta.url);
+const _dirname = dirname(_filename);
 
 const host = 'https://host1.test';
 
@@ -151,7 +159,13 @@ describe('ActivityPub', () => {
 			imports: [GlobalModule, CoreModule],
 		})
 			.overrideProvider(DownloadService).useValue({
-				async downloadUrl(): Promise<{ filename: string }> {
+				async downloadUrl(url: string, path: string): Promise<{ filename: string }> {
+					if (url.endsWith('.png')) {
+						fs.copyFileSync(
+							_dirname + '/../resources/hw.png',
+							path,
+						);
+					}
 					return {
 						filename: 'dummy.tmp',
 					};
