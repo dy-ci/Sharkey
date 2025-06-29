@@ -1,0 +1,30 @@
+QueryService: every 'note.*' needs to be `${noteColumn}.*` and propagate to callers
+
+generateMutedUserRenotesQueryForNotes may no longer be useful (`generateMutedUserQueryForNotes` with `noteColumn:renote` should do the same thing)
+
+
+check all `window.fetch` to set bearer token
+
+`checkMutes` may need to accept a note instead of ref<note>
+
+`useNoteCapture` has been changed, from `use/use-note-capture` to `composables/use-note-capture`; diff and merge and make sure everything uses the correct version
+
+`use-pagination` has also moved, or maybe it got most of the logic moved out of `MkPagination`… copy our changes
+
+`MkPoll` wants a `choices` now?
+
+
+should `MkPostForm` emit `notePosted` when editing or scheduling? probably not
+
+check `MkReactionsViewer` and `MkReaction`
+
+`isEnabledUrlPreview` has moved
+
+
+check that all queue types are visible in the job-queue page
+
+`navbar-for-mobile` is gone, check what we lost
+
+`MkNotificatons` is gone
+
+`MkTimeline` is gone
