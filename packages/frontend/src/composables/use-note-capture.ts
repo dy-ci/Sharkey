@@ -18,6 +18,8 @@ export const noteEvents = new EventEmitter<{
 	[ev: `reacted:${string}`]: (ctx: { userId: Misskey.entities.User['id']; reaction: string; emoji?: { name: string; url: string; }; }) => void;
 	[ev: `unreacted:${string}`]: (ctx: { userId: Misskey.entities.User['id']; reaction: string; emoji?: { name: string; url: string; }; }) => void;
 	[ev: `pollVoted:${string}`]: (ctx: { userId: Misskey.entities.User['id']; choice: string; }) => void;
+	[ev: `updated:${string}`]: (ctx: {}) => void;
+	[ev: `replied:${string}`]: (ctx: { replyId: Misskey.entities.Note['id'] }) => void;
 }>();
 
 const fetchEvent = new EventEmitter<{
@@ -117,12 +119,20 @@ function realtimeSubscribe(props: {
 	const note = props.note;
 	const connection = useStream();
 
-	function onStreamNoteUpdated(noteData): void {
+	async function onStreamNoteUpdated(noteData): void {
 		const { type, id, body } = noteData;
 
 		if (id !== note.id) return;
 
 		switch (type) {
+			case 'replied': {
+				noteEvents.emit(`replied:${id}`, {
+					replyId: body.id,
+				});
+
+				break;
+			}
+
 			case 'reacted': {
 				noteEvents.emit(`reacted:${id}`, {
 					userId: body.userId,
@@ -151,6 +161,11 @@ function realtimeSubscribe(props: {
 
 			case 'deleted': {
 				globalEvents.emit('noteDeleted', id);
+				break;
+			}
+
+			case 'updated': {
+				noteEvents.emit(`updated:${id}`);
 				break;
 			}
 		}
@@ -185,6 +200,17 @@ export type ReactiveNoteData = {
 	reactionEmojis: Misskey.entities.Note['reactionEmojis'];
 	myReaction: Misskey.entities.Note['myReaction'];
 	pollChoices: NonNullable<Misskey.entities.Note['poll']>['choices'];
+	updatedAt: Misskey.entities.Note['updatedAt'];
+	text: Misskey.entities.Note['text'];
+	cw: Misskey.entities.Note['cw'];
+	renote: Misskey.entities.Note['renote'];
+	fileIds: Misskey.entities.Note['fileIds'];
+	files: Misskey.entities.Note['files'];
+	poll: Misskey.entities.Note['poll'];
+	emoji: Misskey.entities.Note['emoji'];
+	hasPoll: Misskey.entities.Note['hasPoll'];
+	isHidden: Misskey.entities.Note['isHidden'];
+	reactionAcceptance: Misskey.entities.Note['reactionAcceptance'];
 };
 
 const noReaction = Symbol();
@@ -212,13 +238,26 @@ export function useNoteCapture(props: {
 		}, {} as Misskey.entities.Note['reactions']),
 		reactionCount: note.reactionCount,
 		reactionEmojis: note.reactionEmojis,
+		repliesCount: note.repliesCount,
 		myReaction: note.myReaction,
 		pollChoices: note.poll?.choices ?? [],
+		updatedAt: note.updatedAt,
+		text: note.text,
+		cw: note.cw,
+		renote: note.renote,
+		fileIds: note.fileIds,
+		files: note.files,
+		poll: note.poll,
+		emoji: note.emoji,
+		hasPoll: note.hasPoll,
+		isHidden: note.isHidden,
+		reactionAcceptance: note.reactionAcceptance,
 	});
 
 	noteEvents.on(`reacted:${note.id}`, onReacted);
 	noteEvents.on(`unreacted:${note.id}`, onUnreacted);
 	noteEvents.on(`pollVoted:${note.id}`, onPollVoted);
+	noteEvents.on(`updated:${note.id}`, onUpdated);
 
 	// 操作がダブっていないかどうかを簡易的に記録するためのMap
 	const reactionUserMap = new Map<Misskey.entities.User['id'], string | typeof noReaction>();
@@ -279,6 +318,21 @@ export function useNoteCapture(props: {
 		$note.pollChoices = choices;
 	}
 
+	async function onUpdated(ctx: {}): Promise<void> {
+		try {
+			const editedNote = await misskeyApi('notes/show', {
+				noteId: note.id,
+			});
+
+			['text', 'cw', 'renote', 'isHidden', 'fileIds', 'files', 'poll', 'emoji', 'hasPoll', 'reactionAcceptance'].forEach(
+				(key) => {
+					$note[key] = editedNote[key];
+				}
+			);
+			$note.pollChoices = editedNote.pollChoices;
+		} catch { /* empty */ }
+	}
+
 	function subscribe() {
 		if (mock) {
 			// モックモードでは購読しない
@@ -301,6 +355,7 @@ export function useNoteCapture(props: {
 		noteEvents.off(`reacted:${note.id}`, onReacted);
 		noteEvents.off(`unreacted:${note.id}`, onUnreacted);
 		noteEvents.off(`pollVoted:${note.id}`, onPollVoted);
+		noteEvents.off(`updated:${note.id}`, onUpdated);
 	});
 
 	// 投稿からある程度経過している(=タイムラインを遡って表示した)ノートは、イベントが発生する可能性が低いためそもそも購読しない
