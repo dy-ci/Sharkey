@@ -23,7 +23,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<MkReactionsViewer ref="reactionsViewer" :note="note"/>
 				<button class="_button" :class="$style.noteFooterButton" @click="reply()">
 					<i class="ph-arrow-u-up-left ph-bold ph-lg"></i>
-					<p v-if="note.repliesCount > 0" :class="$style.noteFooterButtonCount">{{ note.repliesCount }}</p>
+					<p v-if="$appearNote.repliesCount > 0" :class="$style.noteFooterButtonCount">{{ $appearNote.repliesCount }}</p>
 				</button>
 				<button
 					v-if="canRenote"
@@ -72,7 +72,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 		</div>
 	</div>
 	<template v-if="depth < prefer.s.numberOfReplies">
-		<MkNoteSub v-for="reply in replies" :key="reply.id" :note="reply" :class="$style.reply" :detail="true" :depth="depth + 1" :expandAllCws="props.expandAllCws" :onDeleteCallback="removeReply"/>
+		<MkNoteSub v-for="reply in replies" :key="reply.id" :note="reply" :class="$style.reply" :detail="true" :depth="depth + 1" :expandAllCws="props.expandAllCws"/>
 	</template>
 	<div v-else :class="$style.more">
 		<MkA class="_link" :to="notePage(note)">{{ i18n.ts.continueThread }} <i class="ti ti-chevron-double-right"></i></MkA>
@@ -120,18 +120,20 @@ const props = withDefaults(defineProps<{
 	note: Misskey.entities.Note;
 	detail?: boolean;
 	expandAllCws?: boolean;
-	onDeleteCallback?: (id: Misskey.entities.Note['id']) => void;
 
 	// how many notes are in between this one and the note being viewed in detail
 	depth?: number;
 }>(), {
 	depth: 1,
-	onDeleteCallback: undefined,
 });
 
 const appearNote = computed(() => getAppearNote(props.note));
+useNoteCapture({
+	note: appearNote,
+	parentNote: props.note,
+});
 
-const canRenote = computed(() => ['public', 'home'].includes(appearNote.value.visibility) || appearNote.value.userId === $i?.id);
+const canRenote = computed(() => ['public', 'home'].includes(appearNote.visibility) || appearNote.userId === $i?.id);
 
 const el = shallowRef<HTMLElement>();
 const translation = ref<Misskey.entities.NotesTranslateResponse | false | null>(null);
@@ -149,38 +151,48 @@ const renoteTooltip = computeRenoteTooltip(appearNote);
 const defaultLike = computed(() => prefer.s.like ? prefer.s.like : null);
 const replies = ref<Misskey.entities.Note[]>([]);
 
-const mergedCW = computed(() => computeMergedCw(appearNote.value));
+const mergedCW = computed(() => computeMergedCw($appearNote));
 
 const pleaseLoginContext = computed<OpenOnRemoteOptions>(() => ({
 	type: 'lookup',
-	url: appearNote.value.url ?? appearNote.value.uri ?? `${config.url}/notes/${appearNote.value.id}`,
+	url: appearNote.url ?? appearNote.uri ?? `${config.url}/notes/${appearNote.value.id}`,
 }));
 
 const currentClip = inject<Ref<Misskey.entities.Clip> | null>('currentClip', null);
 
+useGlobalEvent('noteDeleted', async (noteId) => {
+	if (noteId === note.id || noteId === appearNote.id) {
+		isDeleted.value = true;
+	}
+	if (replies.includes(noteId)) {
+		await removeReply(noteId);
+	}
+});
+
+noteEvents.on(`replied:${appearNote.id}`, async (noteId) => {
+		if (!props.detail || props.depth >= prefer.s.numberOfReplies) return;
+
+		try {
+      const replyNote = await misskeyApi('notes/show', { noteId });
+
+      await addReplyTo(replyNote);
+    } catch { /* empty */ }
+});
+
 async function addReplyTo(replyNote: Misskey.entities.Note) {
 	replies.value.unshift(replyNote);
-	appearNote.value.repliesCount += 1;
+	$appearNote.value.repliesCount += 1;
 }
 
 async function removeReply(id: Misskey.entities.Note['id']) {
 	const replyIdx = replies.value.findIndex(note => note.id === id);
 	if (replyIdx >= 0) {
 		replies.value.splice(replyIdx, 1);
-		appearNote.value.repliesCount -= 1;
+		$appearNote.value.repliesCount -= 1;
 	}
 }
 
 const { muted, noteMuted } = checkMutes(appearNote);
-
-useNoteCapture({
-	rootEl: el,
-	note: appearNote,
-	isDeletedRef: isDeleted,
-	// only update replies if we are, in fact, showing replies
-	onReplyCallback: props.detail && props.depth < prefer.s.numberOfReplies ? addReplyTo : undefined,
-	onDeleteCallback: props.detail && props.depth < prefer.s.numberOfReplies ? props.onDeleteCallback : undefined,
-});
 
 function focus() {
 	el.value?.focus();
@@ -190,8 +202,8 @@ async function reply(viaKeyboard = false): Promise<void> {
 	pleaseLogin({ openOnRemote: pleaseLoginContext.value });
 	showMovedDialog();
 	await os.post({
-		reply: appearNote.value,
-		channel: appearNote.value.channel ?? undefined,
+		reply: appearNote,
+		channel: appearNote.channel ?? undefined,
 		animation: !viaKeyboard,
 	});
 	focus();
@@ -201,9 +213,9 @@ function react(): void {
 	pleaseLogin({ openOnRemote: pleaseLoginContext.value });
 	showMovedDialog();
 	sound.playMisskeySfx('reaction');
-	if (appearNote.value.reactionAcceptance === 'likeOnly') {
+	if ($appearNote.reactionAcceptance === 'likeOnly') {
 		misskeyApi('notes/like', {
-			noteId: appearNote.value.id,
+			noteId: appearNote.id,
 			override: defaultLike.value,
 		});
 		const el = reactButton.value as HTMLElement | null | undefined;
@@ -217,12 +229,12 @@ function react(): void {
 		}
 	} else {
 		blur();
-		reactionPicker.show(reactButton.value ?? null, appearNote.value, reaction => {
+		reactionPicker.show(reactButton.value ?? null, appearNote, reaction => {
 			misskeyApi('notes/reactions/create', {
-				noteId: appearNote.value.id,
+				noteId: appearNote.id,
 				reaction: reaction,
 			});
-			if (appearNote.value.text && appearNote.value.text.length > 100 && (Date.now() - new Date(appearNote.value.createdAt).getTime() < 1000 * 3)) {
+			if ($appearNote.text && $appearNote.text.length > 100 && (Date.now() - new Date(appearNote.createdAt).getTime() < 1000 * 3)) {
 				claimAchievement('reactWithoutRead');
 			}
 		}, () => {
@@ -236,7 +248,7 @@ function like(): void {
 	showMovedDialog();
 	sound.playMisskeySfx('reaction');
 	misskeyApi('notes/like', {
-		noteId: appearNote.value.id,
+		noteId: appearNote.id,
 		override: defaultLike.value,
 	});
 	const el = likeButton.value as HTMLElement | null | undefined;
@@ -259,12 +271,12 @@ function undoReact(note): void {
 }
 
 function undoRenote() : void {
-	if (!appearNote.value.isRenoted) return;
+	if (!appearNote.isRenoted) return;
 	misskeyApi('notes/unrenote', {
-		noteId: appearNote.value.id,
+		noteId: appearNote.id,
 	});
 	os.toast(i18n.ts.rmboost);
-	appearNote.value.isRenoted = false;
+	appearNote.isRenoted = false;
 
 	const el = renoteButton.value as HTMLElement | null | undefined;
 	if (el) {
@@ -295,7 +307,7 @@ function renote(visibility: Visibility, localOnly: boolean = false) {
 	pleaseLogin({ openOnRemote: pleaseLoginContext.value });
 	showMovedDialog();
 
-	if (appearNote.value.channel) {
+	if (appearNote.channel) {
 		const el = renoteButton.value as HTMLElement | null | undefined;
 		if (el) {
 			const rect = el.getBoundingClientRect();
@@ -307,11 +319,11 @@ function renote(visibility: Visibility, localOnly: boolean = false) {
 		}
 
 		misskeyApi('notes/create', {
-			renoteId: appearNote.value.id,
-			channelId: appearNote.value.channelId,
+			renoteId: appearNote.id,
+			channelId: appearNote.channelId,
 		}).then(() => {
 			os.toast(i18n.ts.renoted);
-			appearNote.value.isRenoted = true;
+			appearNote.isRenoted = true;
 		});
 	} else {
 		const el = renoteButton.value as HTMLElement | null | undefined;
@@ -325,12 +337,12 @@ function renote(visibility: Visibility, localOnly: boolean = false) {
 		}
 
 		misskeyApi('notes/create', {
-			renoteId: appearNote.value.id,
+			renoteId: appearNote.id,
 			localOnly: localOnly,
 			visibility: visibility,
 		}).then(() => {
 			os.toast(i18n.ts.renoted);
-			appearNote.value.isRenoted = true;
+			appearNote.isRenoted = true;
 		});
 	}
 }
@@ -340,12 +352,12 @@ function quote() {
 	showMovedDialog();
 
 	os.post({
-		renote: appearNote.value,
-		channel: appearNote.value.channel ?? undefined,
+		renote: appearNote,
+		channel: appearNote.channel ?? undefined,
 	}).then((cancelled) => {
 		if (cancelled) return;
 		misskeyApi('notes/renotes', {
-			noteId: appearNote.value.id,
+			noteId: appearNote.id,
 			userId: $i?.id,
 			limit: 1,
 			quote: true,
@@ -367,21 +379,21 @@ function quote() {
 }
 
 function menu(): void {
-	const { menu, cleanup } = getNoteMenu({ note: appearNote.value, translating, translation, isDeleted });
+	const { menu, cleanup } = getNoteMenu({ note: appearNote, translating, translation, isDeleted });
 	os.popupMenu(menu, menuButton.value).then(focus).finally(cleanup);
 }
 
 async function clip(): Promise<void> {
-	os.popupMenu(await getNoteClipMenu({ note: appearNote.value, isDeleted, currentClip: currentClip?.value }), clipButton.value).then(focus);
+	os.popupMenu(await getNoteClipMenu({ note: appearNote, isDeleted, currentClip: currentClip?.value }), clipButton.value).then(focus);
 }
 
 async function translate() {
-	await translateNote(appearNote.value.id, translation, translating);
+	await translateNote(appearNote.id, translation, translating);
 }
 
 if (props.detail) {
 	misskeyApi('notes/children', {
-		noteId: appearNote.value.id,
+		noteId: appearNote.id,
 		limit: prefer.s.numberOfReplies,
 		showQuotes: false,
 	}).then(res => {
