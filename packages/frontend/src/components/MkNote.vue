@@ -95,7 +95,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					</div>
 					<MkPoll
 						v-if="$appearNote.poll"
-						:noteId="$appearNote.id"
+						:noteId="appearNote.id"
 						:multiple="$appearNote.poll.multiple"
 						:expiresAt="$appearNote.poll.expiresAt"
 						:choices="$$appearNote.pollChoices"
@@ -106,7 +106,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 						@click.stop
 					/>
 					<div v-if="isEnabledUrlPreview" :class="[$style.urlPreview, '_gaps_s']" @click.stop>
-						<SkUrlPreviewGroup :sourceUrls="urls" :sourceNote="appearNote" :compact="true" :detail="false" :showAsQuote="!appearNote.user.rejectQuotes" :skipNoteIds="selfNoteIds"/>
+						<SkUrlPreviewGroup :sourceUrls="urls" :sourceText="$appearNote.text" :sourceNote="appearNote" :compact="true" :detail="false" :showAsQuote="!appearNote.user.rejectQuotes" :skipNoteIds="selfNoteIds"/>
 					</div>
 					<div v-if="$appearNote.renote" :class="$style.quote"><MkNoteSimple :note="$appearNote.renote" :class="$style.quoteNote"/></div>
 					<button v-if="isLong && collapsed" :class="$style.collapsed" class="_button" @click.stop @click="collapsed = false">
@@ -145,9 +145,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 					v-tooltip="renoteTooltip"
 					:class="$style.footerButton"
 					class="_button"
-					:style="appearNote.isRenoted ? 'color: var(--MI_THEME-accent) !important;' : ''"
+					:style="isRenoted ? 'color: var(--MI_THEME-accent) !important;' : ''"
 					@click.stop
-					@mousedown.prevent="appearNote.isRenoted ? undoRenote(appearNote) : boostVisibility($event.shiftKey)"
+					@mousedown.prevent="isRenoted ? undoRenote(appearNote) : boostVisibility($event.shiftKey)"
 				>
 					<i class="ti ti-repeat"></i>
 					<p v-if="appearNote.renoteCount > 0" :class="$style.footerButtonCount">{{ number(appearNote.renoteCount) }}</p>
@@ -239,7 +239,7 @@ import { $i } from '@/i.js';
 import { i18n } from '@/i18n.js';
 import { getAbuseNoteMenu, getCopyNoteLinkMenu, getNoteClipMenu, getNoteMenu, getRenoteMenu, translateNote } from '@/utility/get-note-menu.js';
 import { getNoteVersionsMenu } from '@/utility/get-note-versions-menu.js';
-import { noteEvents, useNoteCapture } from '@/use/use-note-capture.js';
+import { noteEvents, useNoteCapture } from '@/composables/use-note-capture.js';
 import { deepClone } from '@/utility/clone.js';
 import { useTooltip } from '@/composables/use-tooltip.js';
 import { claimAchievement } from '@/utility/achievements.js';
@@ -338,12 +338,13 @@ const translation = ref<Misskey.entities.NotesTranslateResponse | false | null>(
 const translating = ref(false);
 const showTicker = (prefer.s.instanceTicker === 'always') || (prefer.s.instanceTicker === 'remote' && appearNote.user.instance);
 const canRenote = computed(() => ['public', 'home'].includes(appearNote.visibility) || (appearNote.visibility === 'followers' && appearNote.userId === $i?.id));
+const isRenoted = ref(appearNote.isRenoted);
 const renoteCollapsed = ref(
 	prefer.s.collapseRenotes && isRenote && (
 		($i && ($i.id === note.userId || $i.id === appearNote.userId)) || // `||` must be `||`! See https://github.com/misskey-dev/misskey/issues/13131
 		($appearNote.myReaction != null) ||
 		(appearNote.isFavorited) ||
-		(appearNote.isRenoted)
+		(isRenoted.value)
 	),
 );
 const inReplyToCollapsed = ref(prefer.s.collapseNotesRepliedTo);
@@ -373,7 +374,7 @@ const keymap = {
 	},
 	'q': () => {
 		if (renoteCollapsed.value) return;
-		if (canRenote.value && !appearNote.isRenoted && !renoting) renote(prefer.s.visibilityOnBoost);
+		if (canRenote.value && !isRenoted.value && !renoting) renote(prefer.s.visibilityOnBoost);
 	},
 	'm': () => {
 		if (renoteCollapsed.value) return;
@@ -533,7 +534,7 @@ function renote(visibility: Visibility, localOnly: boolean = false) {
 				channelId: appearNote.channelId,
 			}).then(() => {
 				os.toast(i18n.ts.renoted);
-				appearNote.isRenoted = true;
+				isRenoted.value = true;
 			}).finally(() => { renoting = false; });
 		}
 	} else if (!appearNote.channel || appearNote.channel.allowRenoteToExternal) {
@@ -554,10 +555,12 @@ function renote(visibility: Visibility, localOnly: boolean = false) {
 				renoteId: appearNote.id,
 			}).then(() => {
 				os.toast(i18n.ts.renoted);
-				appearNote.isRenoted = true;
+				isRenoted.value = true;
 			}).finally(() => { renoting = false; });
 		}
 	}
+
+	subscribeManuallyToNoteCapture();
 }
 
 function quote() {
@@ -644,8 +647,13 @@ function like(): void {
 		return;
 	}
 	misskeyApi('notes/like', {
-		noteId: appearNote.value.id,
+		noteId: appearNote.id,
 		override: defaultLike.value,
+	}).then(() => {
+		noteEvents.emit(`reacted:${appearNote.id}`, {
+			userId: $i!.id,
+			reaction: defaultLike.value,
+		});
 	});
 	const el = likeButton.value as HTMLElement | null | undefined;
 	if (el) {
@@ -754,7 +762,7 @@ function undoRenote(note) : void {
 		noteId: note.id,
 	});
 	os.toast(i18n.ts.rmboost);
-	appearNote.isRenoted = false;
+	isRenoted.value = false;
 
 	const el = renoteButton.value as HTMLElement | null | undefined;
 	if (el) {
@@ -802,7 +810,7 @@ function showMenu(): void {
 }
 
 async function menuVersions(): Promise<void> {
-	const { menu, cleanup } = await getNoteVersionsMenu({ note: note.value });
+	const { menu, cleanup } = await getNoteVersionsMenu({ note: note });
 	os.popupMenu(menu, menuVersionsButton.value).then(focus).finally(cleanup);
 }
 

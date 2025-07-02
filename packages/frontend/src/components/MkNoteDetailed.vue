@@ -156,8 +156,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 				v-tooltip="renoteTooltip"
 				class="_button"
 				:class="$style.noteFooterButton"
-				:style="appearNote.isRenoted ? 'color: var(--MI_THEME-accent) !important;' : ''"
-				@mousedown.prevent="appearNote.isRenoted ? undoRenote() : boostVisibility($event.shiftKey)"
+				:style="isRenoted ? 'color: var(--MI_THEME-accent) !important;' : ''"
+				@mousedown.prevent="isRenoted ? undoRenote() : boostVisibility($event.shiftKey)"
 			>
 				<i class="ti ti-repeat"></i>
 				<p v-if="appearNote.renoteCount > 0" :class="$style.noteFooterButtonCount">{{ number(appearNote.renoteCount) }}</p>
@@ -366,6 +366,7 @@ const conversation = ref<Misskey.entities.Note[]>([]);
 const replies = ref<Misskey.entities.Note[]>([]);
 const quotes = ref<Misskey.entities.Note[]>([]);
 const canRenote = computed(() => ['public', 'home'].includes(appearNote.visibility) || (appearNote.visibility === 'followers' && appearNote.userId === $i?.id));
+const isRenoted = ref(appearNote.isRenoted);
 const defaultLike = computed(() => prefer.s.like ? prefer.s.like : null);
 
 const mergedCW = computed(() => computeMergedCw($appearNote));
@@ -405,7 +406,7 @@ const pleaseLoginContext = computed<OpenOnRemoteOptions>(() => ({
 const keymap = {
 	'r': () => reply(),
 	'e|a|plus': () => react(),
-	'q': () => { if (canRenote.value && !appearNote.isRenoted && !renoting) renote(prefer.s.visibilityOnBoost); },
+	'q': () => { if (canRenote.value && !isRenoted.value && !renoting) renote(prefer.s.visibilityOnBoost); },
 	'm': () => showMenu(),
 	'c': () => {
 		if (!prefer.s.showClipButtonInNoteFooter) return;
@@ -445,7 +446,7 @@ const tab = ref(props.initialTab);
 const reactionTabType = ref<string | null>(null);
 
 // Auto-select the first page of reactions
-watch($appearNote, n => {
+watch(appearNote, n => {
 	reactionTabType.value ??= Object.keys(n.reactions)[0] ?? null;
 }, { immediate: true });
 
@@ -576,7 +577,7 @@ function renote(visibility: Visibility, localOnly: boolean = false) {
 			channelId: appearNote.channelId,
 		}).then(() => {
 			os.toast(i18n.ts.renoted);
-			appearNote.isRenoted = true;
+			isRenoted.value = true;
 		}).finally(() => { renoting = false; });
 	} else {
 		const el = renoteButton.value as HTMLElement | null | undefined;
@@ -595,7 +596,7 @@ function renote(visibility: Visibility, localOnly: boolean = false) {
 			renoteId: appearNote.id,
 		}).then(() => {
 			os.toast(i18n.ts.renoted);
-			appearNote.isRenoted = true;
+			isRenoted.value = true;
 		}).finally(() => { renoting = false; });
 	}
 }
@@ -735,6 +736,11 @@ function like(): void {
 	misskeyApi('notes/like', {
 		noteId: appearNote.id,
 		override: defaultLike.value,
+		}).then(() => {
+			noteEvents.emit(`reacted:${appearNote.id}`, {
+				userId: $i!.id,
+				reaction: defaultLike.value,
+			});
 	});
 	const el = likeButton.value as HTMLElement | null | undefined;
 	if (el) {
@@ -747,11 +753,11 @@ function like(): void {
 	}
 }
 
-function undoReact(targetNote: Misskey.entities.Note): void {
-	const oldReaction = targetNote.myReaction;
+function undoReact(): void {
+	const oldReaction = $appearNote.myReaction;
 	if (!oldReaction) return;
 	misskeyApi('notes/reactions/delete', {
-		noteId: targetNote.id,
+		noteId: appearNote.id,
 	}).then(() => {
 		noteEvents.emit(`unreacted:${appearNote.id}`, {
 			userId: $i!.id,
@@ -761,12 +767,12 @@ function undoReact(targetNote: Misskey.entities.Note): void {
 }
 
 function undoRenote() : void {
-	if (!appearNote.isRenoted) return;
+	if (!isRenoted.value) return;
 	misskeyApi('notes/unrenote', {
 		noteId: appearNote.id,
 	});
 	os.toast(i18n.ts.rmboost);
-	appearNote.isRenoted = false;
+	isRenoted.value = false;
 
 	const el = renoteButton.value as HTMLElement | null | undefined;
 	if (el) {
@@ -783,7 +789,7 @@ function toggleReact() {
 	if ($appearNote.myReaction == null) {
 		react();
 	} else {
-		undoReact(appearNote);
+		undoReact();
 	}
 }
 

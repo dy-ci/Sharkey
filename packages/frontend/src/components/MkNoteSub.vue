@@ -31,8 +31,8 @@ SPDX-License-Identifier: AGPL-3.0-only
 					v-tooltip="renoteTooltip"
 					class="_button"
 					:class="$style.noteFooterButton"
-					:style="appearNote.isRenoted ? 'color: var(--MI_THEME-accent) !important;' : ''"
-					@click.stop="appearNote.isRenoted ? undoRenote() : boostVisibility($event.shiftKey)"
+					:style="isRenoted ? 'color: var(--MI_THEME-accent) !important;' : ''"
+					@click.stop="isRenoted ? undoRenote() : boostVisibility($event.shiftKey)"
 				>
 					<i class="ph-rocket-launch ph-bold ph-lg"></i>
 					<p v-if="note.renoteCount > 0" :class="$style.noteFooterButtonCount">{{ note.renoteCount }}</p>
@@ -56,7 +56,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<i v-if="note.reactionAcceptance === 'likeOnly'" class="ph-heart ph-bold ph-lg"></i>
 					<i v-else class="ph-smiley ph-bold ph-lg"></i>
 				</button>
-				<button v-if="note.myReaction != null" ref="reactButton" class="_button" :class="[$style.noteFooterButton, $style.reacted]" @click="undoReact(note)">
+				<button v-if="note.myReaction != null" ref="reactButton" class="_button" :class="[$style.noteFooterButton, $style.reacted]" @click="undoReact()">
 					<i class="ph-minus ph-bold ph-lg"></i>
 				</button>
 				<button v-if="prefer.s.showClipButtonInNoteFooter" ref="clipButton" :class="$style.noteFooterButton" class="_button" @click.stop="clip()">
@@ -128,12 +128,13 @@ const props = withDefaults(defineProps<{
 });
 
 const appearNote = computed(() => getAppearNote(props.note));
-useNoteCapture({
+const { $note: $appearNote } = useNoteCapture({
 	note: appearNote,
-	parentNote: props.note,
+	parentNote: note,
 });
 
 const canRenote = computed(() => ['public', 'home'].includes(appearNote.visibility) || appearNote.userId === $i?.id);
+const isRenoted = ref(appearNote.isRenoted);
 
 const el = shallowRef<HTMLElement>();
 const translation = ref<Misskey.entities.NotesTranslateResponse | false | null>(null);
@@ -217,6 +218,11 @@ function react(): void {
 		misskeyApi('notes/like', {
 			noteId: appearNote.id,
 			override: defaultLike.value,
+		}).then(() => {
+			noteEvents.emit(`reacted:${appearNote.id}`, {
+				userId: $i!.id,
+				reaction: defaultLike.value,
+			});
 		});
 		const el = reactButton.value as HTMLElement | null | undefined;
 		if (el) {
@@ -233,6 +239,11 @@ function react(): void {
 			misskeyApi('notes/reactions/create', {
 				noteId: appearNote.id,
 				reaction: reaction,
+			}).then(() => {
+				noteEvents.emit(`reacted:${appearNote.id}`, {
+					userId: $i!.id,
+					reaction: reaction,
+				});
 			});
 			if ($appearNote.text && $appearNote.text.length > 100 && (Date.now() - new Date(appearNote.createdAt).getTime() < 1000 * 3)) {
 				claimAchievement('reactWithoutRead');
@@ -262,21 +273,26 @@ function like(): void {
 	}
 }
 
-function undoReact(note): void {
-	const oldReaction = note.myReaction;
+function undoReact(): void {
+	const oldReaction = $appearNote.myReaction;
 	if (!oldReaction) return;
 	misskeyApi('notes/reactions/delete', {
-		noteId: note.id,
+		noteId: appearNote.id,
+	}).then(() => {
+		noteEvents.emit(`unreacted:${appearNote.id}`, {
+			userId: $i!.id,
+			reaction: oldReaction,
+		});
 	});
 }
 
 function undoRenote() : void {
-	if (!appearNote.isRenoted) return;
+	if (!isRenoted.value) return;
 	misskeyApi('notes/unrenote', {
 		noteId: appearNote.id,
 	});
 	os.toast(i18n.ts.rmboost);
-	appearNote.isRenoted = false;
+	isRenoted.value = false;
 
 	const el = renoteButton.value as HTMLElement | null | undefined;
 	if (el) {
@@ -323,7 +339,7 @@ function renote(visibility: Visibility, localOnly: boolean = false) {
 			channelId: appearNote.channelId,
 		}).then(() => {
 			os.toast(i18n.ts.renoted);
-			appearNote.isRenoted = true;
+			isRenoted.value = true;
 		});
 	} else {
 		const el = renoteButton.value as HTMLElement | null | undefined;
@@ -342,7 +358,7 @@ function renote(visibility: Visibility, localOnly: boolean = false) {
 			visibility: visibility,
 		}).then(() => {
 			os.toast(i18n.ts.renoted);
-			appearNote.isRenoted = true;
+			isRenoted.value = true;
 		});
 	}
 }
