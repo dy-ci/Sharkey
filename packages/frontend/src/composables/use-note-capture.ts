@@ -87,6 +87,9 @@ window.setInterval(() => {
 			fetchEvent.emit(item.id, {
 				reactions: item.reactions,
 				reactionEmojis: item.reactionEmojis,
+				// TODO DAKKAR this needs to also include all other updatable fields (for
+				// note edits, and maybe replies?) and that of course requires the
+				// `notes/show-partial-bulk` endpoint to expose those bits as well
 			});
 		}
 	});
@@ -102,6 +105,8 @@ function pollingSubscribe(props: {
 		$note.reactions = data.reactions;
 		$note.reactionCount = Object.values(data.reactions).reduce((a, b) => a + b, 0);
 		$note.reactionEmojis = data.reactionEmojis;
+		// TODO DAKKAR this needs to also update all other updatable
+		// fields, see the call to `notes/show-partial-bulk` above
 	}
 
 	pollingEnqueue(note);
