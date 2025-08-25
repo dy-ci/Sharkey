@@ -15,7 +15,7 @@ RUN corepack enable
 
 WORKDIR /sharkey
 
-COPY --link . ./
+COPY . ./
 
 RUN git submodule update --init --recursive
 RUN pnpm config set fetch-retries 5
