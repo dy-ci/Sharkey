@@ -100,14 +100,13 @@ build_image:
   tags:
     - ${ARCH}
   image: docker.io/alpine:latest
-  before_script:
+  script:
     - apk add buildah
     - >-
       buildah login \
         --username "${CI_REGISTRY_USER}" \
         --password "${CI_REGISTRY_PASSWORD}" \
         "${CI_REGISTRY}"
-  script:
     - >-
       buildah build \
         --isolation chroot \
