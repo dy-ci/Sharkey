@@ -113,7 +113,7 @@ build_image:
         --isolation chroot \
         --tag "${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_VERSION}-${ARCH}" \
         "${CI_PROJECT_DIR}"
-    - buildah image push "${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_VERSION}-${ARCH}"
+    - buildah push "${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_VERSION}-${ARCH}"
   only:
     - stable
     - develop
