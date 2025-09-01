@@ -99,47 +99,39 @@ build_image:
       - ARCH: arm64
   tags:
     - ${ARCH}
-  image: docker.io/alpine:latest
+  image: quay.io/buildah/stable
+  variables:
+    STORAGE_DRIVER: vfs
+    BUILDAH_FORMAT: docker
+    BUILDAH_ISOLATION: chroot
   script:
-    - apk add --no-cache buildah fuse-overlayfs aardvark-dns netavark
-    - sed -i 's/#mount_program/mount_program/' /etc/containers/storage.conf
-    - >-
-      buildah login \
-        --username "${CI_REGISTRY_USER}" \
-        --password "${CI_REGISTRY_PASSWORD}" \
-        "${CI_REGISTRY}"
-    - >-
-      buildah build \
-        --isolation chroot \
-        --tag "${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_VERSION}-${ARCH}" \
-        "${CI_PROJECT_DIR}"
-    - buildah push "${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_VERSION}-${ARCH}"
+    - buildah login --username "${CI_REGISTRY_USER}" --password "${CI_REGISTRY_PASSWORD}" ${CI_REGISTRY}
+    - buildah build --arch ${ARCH} -t ${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_VERSION}-${ARCH} .
+    - buildah push -f v2s2 ${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_VERSION}-${ARCH}
   only:
     - stable
     - develop
     - tags
     - merge_requests
 
-merge_image_manifests:
+create_image_manifest:
   stage: deploy
   needs:
     - job: build_image
       artifacts: false
     - job: get_image_tag
       artifacts: true
-  image:
-    name: mplatform/manifest-tool:alpine
-    entrypoint: [""]
+  image: quay.io/buildah/stable
+  variables:
+    STORAGE_DRIVER: vfs
+    BUILDAH_FORMAT: docker
+    BUILDAH_ISOLATION: chroot
   script:
-    - >-
-      manifest-tool \
-        --username=${CI_REGISTRY_USER} \
-        --password=${CI_REGISTRY_PASSWORD} \
-        push from-args \
-        --platforms linux/amd64,linux/arm64 \
-        --tags ${REGISTRY_PUSH_VERSION} \
-        --template ${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_VERSION}-ARCH \
-        --target ${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_TAG}
+    - buildah login --username "${CI_REGISTRY_USER}" --password "${CI_REGISTRY_PASSWORD}" ${CI_REGISTRY}
+    - buildah manifest create ${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_TAG}
+    - buildah manifest add ${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_TAG} docker://${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_VERSION}-arm64
+    - buildah manifest add ${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_TAG} docker://${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_VERSION}-amd64
+    - buildah manifest push -f v2s2 --all ${CI_REGISTRY_IMAGE}:${REGISTRY_PUSH_TAG}
   only:
     - stable
     - develop
