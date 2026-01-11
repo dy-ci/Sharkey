@@ -611,8 +611,8 @@ export class CacheService implements OnApplicationShutdown {
 
 		// Update memory caches from local *and remote* events since the cache doesn't sync automatically.
 		this.internalEventService.on('follow', this.onFollowEvent);
-		this.internalEventService.on('followChanged', this.onFollowEvent);
 		this.internalEventService.on('unfollow', this.onFollowEvent);
+		this.internalEventService.on('followChanged', this.onFollowChangedEvent);
 		this.internalEventService.on('followRequested', this.onFollowRequestEvent);
 		this.internalEventService.on('followRequestCancelled', this.onFollowRequestEvent);
 		this.internalEventService.on('blockingCreated', this.onBlockingEvent);
@@ -683,8 +683,9 @@ export class CacheService implements OnApplicationShutdown {
 	}
 
 	@bindThis
-	private async onFollowEvent<E extends 'follow' | 'unfollow' | 'followChanged'>(body: InternalEventTypes[E], type: E): Promise<void> {
-		const adjustment = type === 'follow' ? 1 : -1;
+	private onFollowEvent<E extends 'follow' | 'unfollow'>(body: InternalEventTypes[E], type: E): void {
+		const isFollowing = type === 'follow';
+		const adjustment = isFollowing ? 1 : -1;
 
 		// Update follower's following count
 		const follower = this.userByIdCache.getMaybe(body.followerId);
@@ -693,28 +694,66 @@ export class CacheService implements OnApplicationShutdown {
 		// Reset follower's follow statistics
 		this.userFollowStatsCache.delete(body.followerId);
 
-		// If followeeId is null, then it means ALL followees for the given follower.
-		const followeeIds = body.followeeId != null
-			? toArray(body.followeeId)
-			: this.userRelationsCache.values()
-				.filter(r => r.userId === body.followerId)
-				.map(r => r.targetUserId);
-
-		for (const followeeId of followeeIds) {
+		for (const followeeId of this.extractFollowees(body.followerId, body.followeeId)) {
 			// Update followee's follower count
 			const followee = this.userByIdCache.getMaybe(followeeId);
 			if (followee) followee.followersCount += adjustment;
 
 			// Update follower's following status
 			const forwardRelation = this.userRelationsCache.getMaybe(`${body.followerId}:${followeeId}`);
-			if (forwardRelation) forwardRelation.isFollowing = type === 'follow';
+			if (forwardRelation) {
+				forwardRelation.isFollowing = isFollowing;
+				if (body.withReplies !== undefined) forwardRelation.isFollowingWithReplies = body.withReplies;
+				if (body.notify !== undefined) forwardRelation.isFollowingWithNotifications = body.notify === 'normal';
+			}
 
 			// Update followee's followed status
 			const backRelation = this.userRelationsCache.getMaybe(`${followeeId}:${body.followerId}`);
-			if (backRelation) backRelation.isFollowed = type === 'follow';
+			if (backRelation) {
+				backRelation.isFollowed = isFollowing;
+				if (body.withReplies !== undefined) backRelation.isFollowedWithReplies = body.withReplies;
+				if (body.notify !== undefined) backRelation.isFollowedWithNotifications = body.notify === 'normal';
+			}
 
 			// Reset follow statistics to recalculate later
 			this.userFollowStatsCache.delete(followeeId);
+		}
+	}
+
+	@bindThis
+	private onFollowChangedEvent<E extends 'followChanged'>(body: InternalEventTypes[E]): void {
+		for (const followeeId of this.extractFollowees(body.followerId, body.followeeId)) {
+			// Update follower's metadata
+			const forwardRelation = this.userRelationsCache.getMaybe(`${body.followerId}:${followeeId}`);
+			if (forwardRelation) {
+				if (body.withReplies !== undefined) forwardRelation.isFollowingWithReplies = body.withReplies;
+				if (body.notify !== undefined) forwardRelation.isFollowingWithNotifications = body.notify === 'normal';
+			}
+
+			// Update followee's followed status
+			const backRelation = this.userRelationsCache.getMaybe(`${followeeId}:${body.followerId}`);
+			if (backRelation) {
+				if (body.withReplies !== undefined) backRelation.isFollowedWithReplies = body.withReplies;
+				if (body.notify !== undefined) backRelation.isFollowedWithNotifications = body.notify === 'normal';
+			}
+		}
+	}
+
+	@bindThis
+	private *extractFollowees(followerId: string, followeeId: string | string[] | null): Generator<string> {
+		// If followeeId is null, then it means ALL followees for the given follower.
+		if (followeeId == null) {
+			for (const r of this.userRelationsCache.values()) {
+				if (r.userId === followerId && r.isFollowed) {
+					yield r.targetUserId; // back ref
+				} else if (r.targetUserId === followerId && r.isFollowing) {
+					yield r.userId; // forward ref
+				}
+			}
+		} else if (Array.isArray(followeeId)) {
+			yield* followeeId;
+		} else {
+			yield followeeId;
 		}
 	}
 
@@ -1234,8 +1273,8 @@ export class CacheService implements OnApplicationShutdown {
 	@bindThis
 	public dispose(): void {
 		this.internalEventService.off('follow', this.onFollowEvent);
-		this.internalEventService.off('followChanged', this.onFollowEvent);
 		this.internalEventService.off('unfollow', this.onFollowEvent);
+		this.internalEventService.off('followChanged', this.onFollowChangedEvent);
 		this.internalEventService.off('followRequested', this.onFollowRequestEvent);
 		this.internalEventService.off('followRequestCancelled', this.onFollowRequestEvent);
 		this.internalEventService.off('blockingCreated', this.onBlockingEvent);

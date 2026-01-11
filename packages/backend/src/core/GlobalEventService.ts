@@ -242,7 +242,7 @@ export interface InternalEventTypes {
 	userUpdated: { id: MiUser['id']; };
 	follow: { followerId: MiUser['id']; followeeId: MiUser['id'] | MiUser['id'][]; withReplies?: boolean, notify?: 'normal' | 'none' };
 	followChanged: { followerId: MiUser['id']; followeeId: MiUser['id'] | MiUser['id'][] | null; withReplies?: boolean, notify?: 'normal' | 'none' };
-	unfollow: { followerId: MiUser['id']; followeeId: MiUser['id'] | MiUser['id'][] | null; };
+	unfollow: { followerId: MiUser['id']; followeeId: MiUser['id'] | MiUser['id'][] | null; withReplies?: undefined, notify?: undefined };
 	followRequested: { followerId: MiUser['id']; followeeId: MiUser['id']; }
 	followRequestCancelled: { followerId: MiUser['id']; followeeId: MiUser['id']; }
 	blockingCreated: { blockerId: MiUser['id']; blockeeId: MiUser['id']; };
