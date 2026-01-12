@@ -398,7 +398,7 @@ export class AccountMoveService {
 	 */
 	@bindThis
 	public async validateAlsoKnownAs(
-		dst: MiLocalUser | MiRemoteUser,
+		dst: MiLocalUser | MiRemoteUser | MiUser,
 		check: (oldUser: MiLocalUser | MiRemoteUser | null, newUser: MiLocalUser | MiRemoteUser) => boolean | Promise<boolean> = () => true,
 		instant = false,
 	): Promise<MiLocalUser | MiRemoteUser | null> {

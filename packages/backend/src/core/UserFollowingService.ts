@@ -24,7 +24,7 @@ import { UserEntityService } from '@/core/entities/UserEntityService.js';
 import { ApRendererService } from '@/core/activitypub/ApRendererService.js';
 import { bindThis } from '@/decorators.js';
 import type { UserBlockingService } from '@/core/UserBlockingService.js';
-import { CacheService } from '@/core/CacheService.js';
+import { CacheService, Requested } from '@/core/CacheService.js';
 import type { Config } from '@/config.js';
 import { AccountMoveService } from '@/core/AccountMoveService.js';
 import { UtilityService } from '@/core/UtilityService.js';
@@ -124,10 +124,12 @@ export class UserFollowingService implements OnModuleInit {
 		/**
 		 * 必ず最新のユーザー情報を取得する
 		 */
-		const [follower, followee] = await Promise.all([
+		const [follower, followee, followeeProfile, relation] = await Promise.all([
 			this.cacheService.findUserById(_follower.id),
 			this.cacheService.findUserById(_followee.id),
-		]) as [MiLocalUser | MiRemoteUser, MiLocalUser | MiRemoteUser];
+			this.cacheService.userProfileCache.fetch(_followee.id),
+			this.cacheService.getUserRelation(_follower.id, _followee.id),
+		]);
 
 		if (this.userEntityService.isRemoteUser(follower) && this.userEntityService.isRemoteUser(followee)) {
 			// What?
@@ -135,10 +137,8 @@ export class UserFollowingService implements OnModuleInit {
 		}
 
 		// check blocking
-		const [blocking, blocked] = await Promise.all([
-			this.userBlockingService.checkBlocked(follower.id, followee.id),
-			this.userBlockingService.checkBlocked(followee.id, follower.id),
-		]);
+		const blocking = relation.isBlocking;
+		const blocked = relation.isBlocked;
 
 		if (this.userEntityService.isRemoteUser(follower) && this.userEntityService.isLocalUser(followee) && blocked) {
 			// リモートフォローを受けてブロックしていた場合は、エラーにするのではなくRejectを送り返しておしまい。
@@ -154,7 +154,7 @@ export class UserFollowingService implements OnModuleInit {
 			if (blocked) throw new IdentifiableError('3338392a-f764-498d-8855-db939dcf8c48', 'blocked');
 		}
 
-		if (await this.cacheService.isFollowing(follower, followee)) {
+		if (relation.isFollowing === true) {
 			// すでにフォロー関係が存在している場合
 			if (this.userEntityService.isRemoteUser(follower) && this.userEntityService.isLocalUser(followee)) {
 				// リモート → ローカル: acceptを送り返しておしまい
@@ -167,7 +167,11 @@ export class UserFollowingService implements OnModuleInit {
 			}
 		}
 
-		const followeeProfile = await this.cacheService.userProfileCache.fetch(followee.id);
+		// Remote instances often re-send follow requests periodically, so make sure we suppress those duplicates.
+		if (relation.isFollowing === Requested) {
+			return;
+		}
+
 		// フォロー対象が鍵アカウントである or
 		// フォロワーがBotであり、フォロー対象がBotからのフォローに慎重である or
 		// フォロワーがローカルユーザーであり、フォロー対象がリモートユーザーである or
@@ -182,16 +186,13 @@ export class UserFollowingService implements OnModuleInit {
 			let autoAccept = false;
 
 			// 鍵アカウントであっても、既にフォローされていた場合はスルー
-			const isFollowing = await this.cacheService.isFollowing(follower, followee);
-			if (isFollowing) {
+			if (relation.isFollowing === true) {
 				autoAccept = true;
 			}
 
 			// フォローしているユーザーは自動承認オプション
 			if (!autoAccept && (this.userEntityService.isLocalUser(followee) && followeeProfile.autoAcceptFollowed)) {
-				const isFollowed = await this.cacheService.isFollowing(followee, follower); // intentionally reversed parameters
-
-				if (isFollowed) autoAccept = true;
+				if (relation.isFollowed === true) autoAccept = true;
 			}
 
 			// Automatically accept if the follower is an account who has moved and the locked followee had accepted the old account.
@@ -432,19 +433,6 @@ export class UserFollowingService implements OnModuleInit {
 		withReplies?: boolean,
 	): Promise<void> {
 		if (follower.id === followee.id) return;
-
-		// Ignore duplicate remote requests
-		if (requestId) {
-			const hasDuplicate = await this.followRequestsRepository.existsBy({
-				followeeId: followee.id,
-				followerId: follower.id,
-				requestId,
-			});
-
-			if (hasDuplicate) {
-				return;
-			}
-		}
 
 		// check blocking
 		const [blocking, blocked] = await Promise.all([
