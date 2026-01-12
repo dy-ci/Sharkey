@@ -5,6 +5,7 @@
 
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import promiseLimit from 'promise-limit';
 import { Brackets, IsNull } from 'typeorm';
 import type { MiLocalUser, MiPartialLocalUser, MiPartialRemoteUser, MiRemoteUser, MiUser } from '@/models/User.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
@@ -420,7 +421,7 @@ export class UserFollowingService implements OnModuleInit {
 	}
 
 	@bindThis
-	public async createFollowRequest(
+	private async createFollowRequest(
 		follower: {
 			id: MiUser['id']; host: MiUser['host']; uri: MiUser['host']; inbox: MiUser['inbox']; sharedInbox: MiUser['sharedInbox'];
 		},
@@ -575,7 +576,8 @@ export class UserFollowingService implements OnModuleInit {
 			follower: true,
 		} });
 
-		await Promise.all(requests.map(request => this.acceptFollowRequest(user, request.follower as MiUser)));
+		const limiter = promiseLimit(4);
+		await Promise.all(requests.map(request => limiter(() => this.acceptFollowRequest(user, request.follower as MiUser))));
 	}
 
 	/**
