@@ -247,27 +247,20 @@ export class UserEntityService implements OnModuleInit {
 	}
 
 	@bindThis
-	public async resolveAlsoKnownAs(user: MiUser): Promise<{ uri: string, id: string | null }[] | null> {
+	public async fetchAlsoKnownAs(user: MiUser): Promise<{ uri: string, id: string | null }[] | null> {
 		if (!user.alsoKnownAs) {
 			return null;
 		}
 
-		const alsoKnownAs: { uri: string, id: string | null }[] = [];
-		for (const uri of new Set(user.alsoKnownAs)) {
-			try {
-				const resolved = await this.apPersonService.resolvePerson(uri);
-				alsoKnownAs.push({ uri, id: resolved.id });
-			} catch {
-				// ignore errors - we expect some users to be deleted or unavailable
-				alsoKnownAs.push({ uri, id: null });
-			}
-		}
-
-		if (alsoKnownAs.length < 1) {
+		const akaUsers = new Map(await this.cacheService.uriPersonCache.fetchMany(user.alsoKnownAs));
+		if (akaUsers.size < 1) {
 			return null;
 		}
 
-		return alsoKnownAs;
+		return user.alsoKnownAs.map(uri => ({
+			uri,
+			id: akaUsers.get(uri) ?? null,
+		}));
 	}
 
 	@bindThis
@@ -403,7 +396,7 @@ export class UserEntityService implements OnModuleInit {
 		const fetchPolicies = () => fetchPoliciesPromise ??= this.roleService.getUserPolicies(user);
 
 		// This has a cache so it's fine to await here
-		const alsoKnownAs = await this.resolveAlsoKnownAs(user);
+		const alsoKnownAs = await this.fetchAlsoKnownAs(user);
 		const alsoKnownAsIds = alsoKnownAs?.map(aka => aka.id).filter(id => id != null) ?? null;
 
 		const bypassSilence = isMe || !!relation?.isFollowing;

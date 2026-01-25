@@ -327,8 +327,7 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				user: movedToUser ? await this.userEntityService.pack(movedToUser, me, { schema: 'UserDetailed' }) : undefined,
 			} : null;
 
-			// This is kinda heavy, but it's an admin endpoint so ok.
-			const aka = await this.userEntityService.resolveAlsoKnownAs(user);
+			const aka = await this.userEntityService.fetchAlsoKnownAs(user);
 			const akaUsers = aka ? await this.userEntityService.packMany(aka.map(aka => aka.id).filter(id => id != null), me, { schema: 'UserDetailed' }) : [];
 			const alsoKnownAs = aka?.map(aka => ({
 				uri: aka.uri,
