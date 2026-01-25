@@ -53,10 +53,7 @@ export class RemoteUserResolveService {
 	@bindThis
 	public async resolveUser(username: string, host: string | null): Promise<MiLocalUser | MiRemoteUser> {
 		// Normalize inputs
-		username = username.toLowerCase();
-		host = host ? this.utilityService.toPuny(host) : null; // unicode -> punycode
-		host = host !== this.selfHost ? host : null; // self-host -> null
-		const acct = Acct.toString({ username, host }); // username+host -> acct (handle)
+		const acct = this.utilityService.stringifyAcct({ username, host });
 
 		// Try fetch from DB
 		let user: MiUser | null | undefined = await this.cacheService.findOptionalUserByAcct(acct);
