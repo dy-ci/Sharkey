@@ -584,6 +584,54 @@ export class ApPersonService implements OnModuleInit {
 	}
 
 	/**
+	 * Validates that a given user is up-to-date - and if not, updates them from the remote.
+	 * Updates are skipped for local, recently-updated, and inactive users.
+	 * The input user is not modified; instead, a new user object is returned.
+	 * @param user User to check and update.
+	 * @param opts Optional settings:
+	 *   * timeout - maximum age before a user will be updated. (default: 24 hours)
+	 *   * ignoreErrors - whether to suppress exceptions thrown while fetching the user. (default: false)
+	 *   * resolver - optional resolver instance to use. (default: new temporary instance)
+	 */
+	@bindThis
+	public async ensureUpdated(user: MiUser, opts?: { timeout?: number, ignoreErrors?: boolean, resolver?: Resolver | null }): Promise<MiUser> {
+		const timeout = opts?.timeout ?? 1000 * 60 * 60 * 24;
+		const ignoreErrors = opts?.ignoreErrors ?? false;
+		const resolver = opts?.resolver ?? this.apResolverService.createResolver();
+
+		// Refresh from cache, in case they've changed concurrently
+		user = await this.cacheService.findUserById(user.id);
+
+		// Local user is always updated
+		if (!isRemoteUser(user)) return user;
+
+		// Skip if recently updated
+		if (user.updatedAt && this.timeService.now - user.updatedAt.valueOf() < timeout) return user;
+
+		// Skip if recently checked (and found to have no updates)
+		if (user.lastFetchedAt && this.timeService.now - user.lastFetchedAt.valueOf() < timeout) return user;
+
+		// Skip if inactive
+		if (!this.utilityService.isActiveRemoteUser(user)) return user;
+
+		// Update the user
+		try {
+			await this.updatePerson(user.uri, resolver);
+		} catch (err) {
+			if (!ignoreErrors) {
+				throw err;
+			}
+
+			// Mark as checked to prevent repeated fetch failures
+			await this.usersRepository.update({ id: user.id }, { lastFetchedAt: this.timeService.date });
+			await this.internalEventService.emit('userUpdated', { id: user.id });
+		}
+
+		// Reload the updated user
+		return await this.cacheService.findUserById(user.id);
+	}
+
+	/**
 	 * Schedules a deferred update on the background task worker.
 	 * Duplicate updates are automatically skipped.
 	 */
