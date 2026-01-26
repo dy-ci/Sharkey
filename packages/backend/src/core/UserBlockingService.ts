@@ -63,7 +63,12 @@ export class UserBlockingService implements OnModuleInit {
 	}
 
 	@bindThis
-	public async block(blocker: MiUser, blockee: MiUser, silent = false) {
+	public async block(blockerOrId: MiUser | MiUser['id'], blockeeOrId: MiUser | MiUser['id'], silent = false) {
+		const [blocker, blockee] = await Promise.all([
+			typeof(blockerOrId) === 'object' ? blockerOrId : this.cacheService.findUserById(blockerOrId),
+			typeof(blockeeOrId) === 'object' ? blockeeOrId : this.cacheService.findUserById(blockeeOrId),
+		]);
+
 		await Promise.all([
 			this.cancelRequest(blocker, blockee, silent),
 			this.cancelRequest(blockee, blocker, silent),
