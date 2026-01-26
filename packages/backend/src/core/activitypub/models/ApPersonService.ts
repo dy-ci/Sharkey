@@ -617,7 +617,7 @@ export class ApPersonService implements OnModuleInit {
 
 		//#region このサーバーに既に登録されているか
 		const exist = await this.fetchPerson(uri) as MiRemoteUser | null;
-		if (exist === null) return;
+		if (exist === null || exist.isDeleted) return;
 		//#endregion
 
 		if (resolver == null) resolver = this.apResolverService.createResolver();
@@ -734,9 +734,7 @@ export class ApPersonService implements OnModuleInit {
 		if (moving) updates.movedAt = this.timeService.date;
 
 		// Update user
-		if (!(await this.usersRepository.update({ id: exist.id, isDeleted: false }, updates)).affected) {
-			return `skip: user ${exist.id} is deleted`;
-		}
+		await this.usersRepository.update({ id: exist.id }, updates);
 
 		// Notify event ASAP
 		await this.internalEventService.emit('remoteUserUpdated', { id: exist.id });
