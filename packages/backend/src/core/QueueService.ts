@@ -22,6 +22,7 @@ import type Logger from '@/logger.js';
 import type { SystemWebhookPayload } from '@/core/SystemWebhookService.js';
 import type { MiNote } from '@/models/Note.js';
 import type { MinimalNote } from '@/misc/is-renote.js';
+import type { MigrationOpts } from '@/core/AccountMoveService.js';
 import { type UserWebhookPayload } from './UserWebhookService.js';
 import type {
 	BackgroundTaskJobData,
@@ -807,8 +808,8 @@ export class QueueService implements OnModuleInit {
 	}
 
 	@bindThis
-	public createMoveJob(from: ThinUser, to: ThinUser) {
-		const job = this.generateRelationshipJobData('move', { from, to });
+	public createMoveJob(from: ThinUser, to: ThinUser, silent?: boolean) {
+		const job = this.generateRelationshipJobData('move', { from, to, silent });
 		return this.relationshipQueue.add(job.name, job.data, job.opts);
 	}
 
@@ -962,6 +963,11 @@ export class QueueService implements OnModuleInit {
 	@bindThis
 	public async createDeleteApLogsJob(dataType: 'inbox' | 'object', data: string | string[]) {
 		return await this.createBackgroundTask({ type: 'delete-ap-logs', dataType, data });
+	}
+
+	@bindThis
+	public async createCheckUserMigrationJob(userId: string, opts?: MigrationOpts) {
+		return await this.createBackgroundTask({ type: 'check-user-migration', userId, opts }, userId);
 	}
 
 	private async createBackgroundTask<T extends BackgroundTaskJobData>(data: T, duplication?: string | { id: string, ttl?: number }) {

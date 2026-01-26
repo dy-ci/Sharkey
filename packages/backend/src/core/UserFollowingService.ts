@@ -26,7 +26,7 @@ import { bindThis } from '@/decorators.js';
 import type { UserBlockingService } from '@/core/UserBlockingService.js';
 import { CacheService, Requested } from '@/core/CacheService.js';
 import type { Config } from '@/config.js';
-import { AccountMoveService } from '@/core/AccountMoveService.js';
+import type { AccountMoveService } from '@/core/AccountMoveService.js';
 import { UtilityService } from '@/core/UtilityService.js';
 import type { ThinUser } from '@/queue/types.js';
 import { LoggerService } from '@/core/LoggerService.js';
@@ -52,6 +52,7 @@ type Both = Local | Remote;
 @Injectable()
 export class UserFollowingService implements OnModuleInit {
 	private userBlockingService: UserBlockingService;
+	private accountMoveService: AccountMoveService;
 	private readonly logger: Logger;
 
 	constructor(
@@ -88,7 +89,6 @@ export class UserFollowingService implements OnModuleInit {
 		private federatedInstanceService: FederatedInstanceService,
 		private webhookService: UserWebhookService,
 		private apRendererService: ApRendererService,
-		private accountMoveService: AccountMoveService,
 		private perUserFollowingChart: PerUserFollowingChart,
 		private instanceChart: InstanceChart,
 		private readonly internalEventService: InternalEventService,
@@ -103,6 +103,7 @@ export class UserFollowingService implements OnModuleInit {
 	@bindThis
 	onModuleInit() {
 		this.userBlockingService = this.moduleRef.get('UserBlockingService');
+		this.accountMoveService = this.moduleRef.get('AccountMoveService');
 	}
 
 	@bindThis

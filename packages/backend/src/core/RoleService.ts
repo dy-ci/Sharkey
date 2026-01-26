@@ -736,7 +736,7 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 	}
 
 	@bindThis
-	public async assign(userId: MiUser['id'], roleId: MiRole['id'], expiresAt: Date | null = null, moderator?: MiUser): Promise<void> {
+	public async assign(userId: MiUser['id'], roleId: MiRole['id'], expiresAt: Date | null = null, moderator?: MiUser, silent = false): Promise<void> {
 		const now = this.timeService.now;
 
 		const role = await this.rolesRepository.findOneByOrFail({ id: roleId });
@@ -772,7 +772,7 @@ export class RoleService implements OnApplicationShutdown, OnModuleInit {
 
 		const user = await this.cacheService.findUserById(userId);
 
-		if (role.isPublic && user.host === null) {
+		if (role.isPublic && user.host === null && !silent) {
 			this.notificationService.createNotification(userId, 'roleAssigned', {
 				roleId: roleId,
 			});

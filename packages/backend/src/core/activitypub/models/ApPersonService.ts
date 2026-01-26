@@ -12,7 +12,7 @@ import { DI } from '@/di-symbols.js';
 import type { FollowingsRepository, InstancesRepository, MiMeta, UserProfilesRepository, UserPublickeysRepository, UsersRepository } from '@/models/_.js';
 import type { Config } from '@/config.js';
 import type { MiLocalUser, MiRemoteUser } from '@/models/User.js';
-import { isRemoteUser, isLocalUser } from '@/models/User.js';
+import { isRemoteUser } from '@/models/User.js';
 import { MiUser } from '@/models/User.js';
 import { truncate } from '@/misc/truncate.js';
 import type { CacheService } from '@/core/CacheService.js';
@@ -36,7 +36,6 @@ import { UtilityService } from '@/core/UtilityService.js';
 import { bindThis } from '@/decorators.js';
 import { RoleService } from '@/core/RoleService.js';
 import type { DriveFileEntityService } from '@/core/entities/DriveFileEntityService.js';
-import type { AccountMoveService } from '@/core/AccountMoveService.js';
 import { ApUtilityService } from '@/core/activitypub/ApUtilityService.js';
 import { AppLockService } from '@/core/AppLockService.js';
 import { HttpRequestService } from '@/core/HttpRequestService.js';
@@ -82,7 +81,6 @@ export class ApPersonService implements OnModuleInit {
 	private hashtagService: HashtagService;
 	private usersChart: UsersChart;
 	private instanceChart: InstanceChart;
-	private accountMoveService: AccountMoveService;
 	private logger: Logger;
 	private idService: IdService;
 
@@ -163,7 +161,6 @@ export class ApPersonService implements OnModuleInit {
 		this.hashtagService = this.moduleRef.get('HashtagService');
 		this.usersChart = this.moduleRef.get('UsersChart');
 		this.instanceChart = this.moduleRef.get('InstanceChart');
-		this.accountMoveService = this.moduleRef.get('AccountMoveService');
 		this.idService = this.moduleRef.get('IdService');
 	}
 
@@ -457,7 +454,6 @@ export class ApPersonService implements OnModuleInit {
 					enableRss: person.enableRss === true,
 					isLocked: person.manuallyApprovesFollowers,
 					movedToUri: person.movedTo,
-					movedAt: person.movedTo ? this.timeService.date : null,
 					alsoKnownAs: person.alsoKnownAs,
 					// We use "!== false" to handle incorrect types, missing / null values, and "default to true" logic.
 					hideOnlineStatus: person.hideOnlineStatus !== false,
@@ -575,10 +571,14 @@ export class ApPersonService implements OnModuleInit {
 		}
 		//#endregion
 
-		// ハッシュタグ更新
-		await this.queueService.createUpdateUserTagsJob(user.id);
-
-		await this.updateFeaturedLazy(user);
+		await Promise.all([
+			// Account migration
+			this.queueService.createCheckUserMigrationJob(user.id),
+			// ハッシュタグ更新
+			this.queueService.createUpdateUserTagsJob(user.id),
+			// Pinned notes
+			this.updateFeaturedLazy(user),
+		]);
 
 		return user;
 	}
@@ -654,10 +654,9 @@ export class ApPersonService implements OnModuleInit {
 	 * @param uri URI of Person
 	 * @param resolver Resolver
 	 * @param hint Hint of Person object (この値が正当なPersonの場合、Remote resolveをせずに更新に利用します)
-	 * @param movePreventUris ここに指定されたURIがPersonのmovedToに指定されていたり10回より多く回っている場合これ以上アカウント移行を行わない（無限ループ防止）
 	 */
 	@bindThis
-	public async updatePerson(uri: string, resolver?: Resolver | null, hint?: IObject, movePreventUris: string[] = []): Promise<string | void> {
+	public async updatePerson(uri: string, resolver?: Resolver | null, hint?: IObject): Promise<void> {
 		if (typeof uri !== 'string') throw new UnrecoverableError(`failed to update user ${uri}: input is not string`);
 
 		// URIがこのサーバーを指しているならスキップ
@@ -740,7 +739,8 @@ export class ApPersonService implements OnModuleInit {
 			noindex: (person as any).noindex ?? false,
 			enableRss: person.enableRss === true,
 			isLocked: person.manuallyApprovesFollowers,
-			movedToUri: person.movedTo ?? null,
+			// movedToUri is locked after migration is successfully processed
+			movedToUri: exist.movedAt == null ? person.movedTo : undefined,
 			alsoKnownAs: person.alsoKnownAs ?? null,
 			// We use "!== false" to handle incorrect types, missing / null values, and "default to true" logic.
 			hideOnlineStatus: person.hideOnlineStatus !== false,
@@ -760,26 +760,6 @@ export class ApPersonService implements OnModuleInit {
 				return {};
 			})),
 		} as Partial<MiRemoteUser> & Pick<MiRemoteUser, 'isBot' | 'isCat' | 'speakAsCat' | 'isLocked' | 'movedToUri' | 'alsoKnownAs' | 'isExplorable'>;
-
-		const moving = ((): boolean => {
-			// 移行先がない→ある
-			if (
-				exist.movedToUri === null &&
-				updates.movedToUri
-			) return true;
-
-			// 移行先がある→別のもの
-			if (
-				exist.movedToUri !== null &&
-				updates.movedToUri !== null &&
-				exist.movedToUri !== updates.movedToUri
-			) return true;
-
-			// 移行先がある→ない、ない→ないは無視
-			return false;
-		})();
-
-		if (moving) updates.movedAt = this.timeService.date;
 
 		// Update user
 		await this.usersRepository.update({ id: exist.id }, updates);
@@ -850,31 +830,14 @@ export class ApPersonService implements OnModuleInit {
 			);
 		}
 
-		// ハッシュタグ更新
-		await this.queueService.createUpdateUserTagsJob(updated.id);
-
-		await this.updateFeaturedLazy(updated);
-
-		// 移行処理を行う
-		if (updated.movedAt && (
-			// 初めて移行する場合はmovedAtがnullなので移行処理を許可
-			exist.movedAt == null ||
-			// 以前のmovingから14日以上経過した場合のみ移行処理を許可
-			// （Mastodonのクールダウン期間は30日だが若干緩めに設定しておく）
-			exist.movedAt.getTime() + 1000 * 60 * 60 * 24 * 14 < updated.movedAt.getTime()
-		)) {
-			this.logger.info(`Start to process Move of @${updated.username}@${updated.host} (${uri})`);
-			return this.processRemoteMove(updated, movePreventUris)
-				.then(result => {
-					this.logger.info(`Processing Move Finished [${result}] @${updated.username}@${updated.host} (${uri})`);
-					return result;
-				})
-				.catch(e => {
-					this.logger.info(`Processing Move Failed @${updated.username}@${updated.host} (${uri}): ${renderInlineError(e)}`);
-				});
-		}
-
-		return 'skip: too soon to migrate accounts';
+		await Promise.all([
+			// Account migration
+			this.queueService.createCheckUserMigrationJob(updated.id),
+			// ハッシュタグ更新
+			this.queueService.createUpdateUserTagsJob(updated.id),
+			// Pinned notes
+			this.updateFeaturedLazy(updated),
+		]);
 	}
 
 	/**
@@ -1011,56 +974,6 @@ export class ApPersonService implements OnModuleInit {
 				});
 			}
 		});
-	}
-
-	/**
-	 * リモート由来のアカウント移行処理を行います
-	 * @param src 移行元アカウント（リモートかつupdatePerson後である必要がある、というかこれ自体がupdatePersonで呼ばれる前提）
-	 * @param movePreventUris ここに列挙されたURIにsrc.movedToUriが含まれる場合、移行処理はしない（無限ループ防止）
-	 */
-	@bindThis
-	private async processRemoteMove(src: MiRemoteUser, movePreventUris: string[] = []): Promise<string> {
-		if (!src.movedToUri) return 'skip: no movedToUri';
-		if (src.uri === src.movedToUri) return 'skip: movedTo itself (src)'; // ？？？
-		if (movePreventUris.length > 10) return 'skip: too many moves';
-
-		// まずサーバー内で検索して様子見
-		let dst = await this.fetchPerson(src.movedToUri);
-
-		if (dst && isLocalUser(dst)) {
-			// TODO this branch should not be possible
-			// targetがローカルユーザーだった場合データベースから引っ張ってくる
-			dst = await this.cacheService.findLocalUserByUri(src.movedToUri);
-		} else if (dst) {
-			if (movePreventUris.includes(src.movedToUri)) return 'skip: circular move';
-
-			// targetを見つけたことがあるならtargetをupdatePersonする
-			await this.updatePerson(src.movedToUri, undefined, undefined, [...movePreventUris, src.uri]);
-			dst = await this.fetchPerson(src.movedToUri) ?? dst;
-		} else {
-			if (this.utilityService.isUriLocal(src.movedToUri)) {
-				// ローカルユーザーっぽいのにfetchPersonで見つからないということはmovedToUriが間違っている
-				return 'failed: movedTo is local but not found';
-			}
-
-			// targetが知らない人だったらresolvePerson
-			// (uriが存在しなかったり応答がなかったりする場合resolvePersonはthrow Errorする)
-			dst = await this.resolvePerson(src.movedToUri);
-		}
-
-		if (dst.movedToUri === dst.uri) return 'skip: movedTo itself (dst)'; // ？？？
-		if (src.movedToUri !== dst.uri) return 'skip: missmatch uri'; // ？？？
-		if (dst.movedToUri === src.uri) return 'skip: dst.movedToUri === src.uri';
-		if (!dst.alsoKnownAs || dst.alsoKnownAs.length === 0) {
-			return 'skip: dst.alsoKnownAs is empty';
-		}
-		if (!dst.alsoKnownAs.includes(src.uri)) {
-			return 'skip: alsoKnownAs does not include from.uri';
-		}
-
-		await this.queueService.createMoveJob(src, dst);
-
-		return 'ok';
 	}
 
 	@bindThis

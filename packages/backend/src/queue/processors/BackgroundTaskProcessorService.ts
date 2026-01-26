@@ -5,7 +5,23 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 import * as Bull from 'bullmq';
-import { BackgroundTaskJobData, PostDeliverBackgroundTask, PostInboxBackgroundTask, PostNoteBackgroundTask, UpdateFeaturedBackgroundTask, UpdateInstanceBackgroundTask, UpdateUserTagsBackgroundTask, UpdateUserBackgroundTask, UpdateNoteTagsBackgroundTask, DeleteFileBackgroundTask, UpdateLatestNoteBackgroundTask, PostSuspendBackgroundTask, PostUnsuspendBackgroundTask, DeleteApLogsBackgroundTask } from '@/queue/types.js';
+import {
+	BackgroundTaskJobData,
+	PostDeliverBackgroundTask,
+	PostInboxBackgroundTask,
+	PostNoteBackgroundTask,
+	UpdateFeaturedBackgroundTask,
+	UpdateInstanceBackgroundTask,
+	UpdateUserTagsBackgroundTask,
+	UpdateUserBackgroundTask,
+	UpdateNoteTagsBackgroundTask,
+	DeleteFileBackgroundTask,
+	UpdateLatestNoteBackgroundTask,
+	PostSuspendBackgroundTask,
+	PostUnsuspendBackgroundTask,
+	DeleteApLogsBackgroundTask,
+	CheckUserMigrationTask,
+} from '@/queue/types.js';
 import { ApPersonService } from '@/core/activitypub/models/ApPersonService.js';
 import { QueueLoggerService } from '@/queue/QueueLoggerService.js';
 import Logger from '@/logger.js';
@@ -30,6 +46,9 @@ import { CollapsedQueueService } from '@/core/CollapsedQueueService.js';
 import { isRemoteUser } from '@/models/User.js';
 import { errorCodes, IdentifiableError } from '@/misc/identifiable-error.js';
 import { TimeService } from '@/global/TimeService.js';
+import { UtilityService } from '@/core/UtilityService.js';
+import { AccountMoveService } from '@/core/AccountMoveService.js';
+import { UserEntityService } from '@/core/entities/UserEntityService.js';
 
 @Injectable()
 export class BackgroundTaskProcessorService {
@@ -67,6 +86,9 @@ export class BackgroundTaskProcessorService {
 		private readonly userSuspendService: UserSuspendService,
 		private readonly apLogService: ApLogService,
 		private readonly timeService: TimeService,
+		private readonly utilityService: UtilityService,
+		private readonly accountMoveService: AccountMoveService,
+		private readonly userEntityService: UserEntityService,
 
 		queueLoggerService: QueueLoggerService,
 	) {
@@ -98,9 +120,11 @@ export class BackgroundTaskProcessorService {
 			return await this.processPostSuspend(job.data);
 		} else if (job.data.type === 'post-unsuspend') {
 			return await this.processPostUnsuspend(job.data);
-			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
 		} else if (job.data.type === 'delete-ap-logs') {
 			return await this.processDeleteApLogs(job.data);
+			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+		} else if (job.data.type === 'check-user-migration') {
+			return await this.processCheckUserMigration(job.data);
 		} else {
 			this.logger.warn(`Can't process unknown job type "${job.data}"; this is likely a bug. Full job data:`, job.data);
 			throw new Error(`Unknown job type ${job.data}, see system logs for details`);
@@ -337,6 +361,17 @@ export class BackgroundTaskProcessorService {
 			this.logger.warn(`Can't process unknown data type "${task.dataType}"; this is likely a bug. Full task data:`, task);
 			throw new Error(`Unknown task type ${task.dataType}, see system logs for details`);
 		}
+
+		return 'ok';
+	}
+
+	private async processCheckUserMigration(task: CheckUserMigrationTask): Promise<string> {
+		const user = await this.cacheService.findOptionalUserById(task.userId);
+		if (!user || user.isDeleted) return `Skipping check-user-migration task: user ${task.userId} has been deleted`;
+		if (!isRemoteUser(user) || !this.utilityService.isActiveRemoteUser(user)) return `Skipping check-user-migration task: user ${task.userId} is not active`;
+
+		const uri = this.userEntityService.getUserUri(user);
+		await this.accountMoveService.checkUserMigration(uri);
 
 		return 'ok';
 	}

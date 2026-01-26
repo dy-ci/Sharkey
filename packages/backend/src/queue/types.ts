@@ -12,6 +12,7 @@ import type { MiWebhook, WebhookEventTypes } from '@/models/Webhook.js';
 import type { IActivity } from '@/core/activitypub/type.js';
 import type { SystemWebhookPayload } from '@/core/SystemWebhookService.js';
 import type { UserWebhookPayload } from '@/core/UserWebhookService.js';
+import type { MigrationOpts } from '@/core/AccountMoveService.js';
 import type { MinimalNote } from '@/misc/is-renote.js';
 import type httpSignature from '@peertube/http-signature';
 
@@ -183,7 +184,8 @@ export type BackgroundTaskJobData =
 	UpdateLatestNoteBackgroundTask |
 	PostSuspendBackgroundTask |
 	PostUnsuspendBackgroundTask |
-	DeleteApLogsBackgroundTask;
+	DeleteApLogsBackgroundTask |
+	CheckUserMigrationTask;
 
 export type UpdateUserBackgroundTask = {
 	type: 'update-user';
@@ -254,4 +256,10 @@ export type DeleteApLogsBackgroundTask = {
 	type: 'delete-ap-logs';
 	dataType: 'inbox' | 'object';
 	data: string | string[];
+};
+
+export type CheckUserMigrationTask = {
+	type: 'check-user-migration';
+	userId: string;
+	opts?: MigrationOpts;
 };

@@ -30,6 +30,7 @@ import type { MiRemoteUser } from '@/models/User.js';
 import { GlobalEventService } from '@/core/GlobalEventService.js';
 import { AbuseReportService } from '@/core/AbuseReportService.js';
 import { FederatedInstanceService } from '@/core/FederatedInstanceService.js';
+import { AccountMoveService } from '@/core/AccountMoveService.js';
 import { fromTuple } from '@/misc/from-tuple.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
 import { renderInlineError } from '@/misc/render-inline-error.js';
@@ -96,6 +97,7 @@ export class ApInboxService {
 		private readonly cacheService: CacheService,
 		private readonly noteVisibilityService: NoteVisibilityService,
 		private readonly internalEventService: InternalEventService,
+		private readonly accountMoveService: AccountMoveService,
 	) {
 		this.logger = this.apLoggerService.logger;
 	}
@@ -865,10 +867,26 @@ export class ApInboxService {
 
 	@bindThis
 	private async move(actor: MiRemoteUser, activity: IMove, resolver?: Resolver): Promise<string> {
-		// fetch the new and old accounts
-		const targetUri = getApHrefNullable(activity.target);
-		if (!targetUri) return 'skip: invalid activity target';
+		const targetUri = getNullableApId(activity.target);
+		if (!targetUri) {
+			// activity is invalid (missing the target property)
+			return 'skip: missing Move target';
+		} else if (actor.movedAt) {
+			if (actor.movedToUri === targetUri) {
+				// activity is duplicate, or we preemptively migrated the user after the last Update(Person)
+				return 'ok: migration was already completed';
+			} else {
+				// activity is invalid (user is attempting to migrate to multiple accounts)
+				return 'skip: actor has already migrated to a different account';
+			}
+		} else if (actor.movedToUri !== targetUri) {
+			// we have a pending migration, but it hasn't completed so we may be able to change the target now.
+			// for safety (security & race), don't trust the targetUri. Just update the user from remote and use whatever's there.
+			await this.apPersonService.updatePerson(actor.uri, resolver);
+		}
 
-		return await this.apPersonService.updatePerson(actor.uri, resolver) ?? 'skip: nothing to do';
+		// Check for and complete any pending migrations for this user.
+		await this.accountMoveService.checkUserMigration(actor.uri, { resolver });
+		return 'ok';
 	}
 }

@@ -9,7 +9,7 @@ import { IsNull, In, MoreThan, Not } from 'typeorm';
 import { bindThis } from '@/decorators.js';
 import { DI } from '@/di-symbols.js';
 import type { MiLocalUser, MiRemoteUser, MiUser } from '@/models/User.js';
-import { isLocalUser } from '@/models/User.js';
+import { isLocalUser, isRemoteUser } from '@/models/User.js';
 import type { BlockingsRepository, FollowingsRepository, InstancesRepository, MiMeta, MutingsRepository, UserListMembershipsRepository, UsersRepository, NoteScheduleRepository, MiNoteSchedule } from '@/models/_.js';
 import type { RelationshipJobData, ThinUser } from '@/queue/types.js';
 
@@ -39,6 +39,37 @@ import { renderInlineError } from '@/misc/render-inline-error.js';
 import { IdentifiableError } from '@/misc/identifiable-error.js';
 import type { Packed } from '@/misc/json-schema.js';
 import type { Config } from '@/config.js';
+import { ApResolverService, type Resolver } from '@/core/activitypub/ApResolverService.js';
+import { UtilityService } from '@/core/UtilityService.js';
+import { UserFollowingService } from '@/core/UserFollowingService.js';
+import { UserBlockingService } from '@/core/UserBlockingService.js';
+
+export interface MigrationOpts {
+	/**
+	 * If true, notifications are suppressed for the migration.
+	 * If false, normal notifications are produced.
+	 * If null (default), notification are produced unless this is a repeat (forced) migration.
+	 */
+	silent?: boolean | null;
+
+	/**
+	 * If true, miration will run even if already complete.
+	 * If false (default), migration will be skipped if it's completed successfully.
+	 */
+	allowRepeat?: boolean;
+
+	/**
+	 * If true, allow inactive (suspended, deleted, defederated, etc) users to migrate.
+	 * If false (default), migration is skipped for inactive users.
+	 */
+	allowInactive?: boolean;
+
+	/**
+	 * If true, await all migration sub-steps and return only after the entire process is done.
+	 * If false (default), additional background jobs are created to asynchronously complete sub-steps.
+	 */
+	immediate?: boolean;
+}
 
 @Injectable()
 export class AccountMoveService {
@@ -93,6 +124,10 @@ export class AccountMoveService {
 		private readonly loggerService: LoggerService,
 		private readonly envService: EnvService,
 		private readonly collapsedQueueService: CollapsedQueueService,
+		private readonly apResolverService: ApResolverService,
+		private readonly utilityService: UtilityService,
+		private readonly userFollowingService: UserFollowingService,
+		private readonly userBlockingService: UserBlockingService,
 	) {
 		this.logger = this.loggerService.getLogger('account-move');
 	}
@@ -103,15 +138,9 @@ export class AccountMoveService {
 			throw new IdentifiableError('ddcf173a-00f2-4aa4-ba12-cddd131bacf4', `Can't restart migrated for user ${src.id}: user has not migrated`);
 		}
 
-		const dst = await this.apPersonService.resolvePerson(src.movedToUri);
-		this.logger.info(`Restarting migration from ${src.id} (@${src.usernameLower}@${src.host ?? this.config.host}) to ${dst.id} (@${dst.usernameLower}@${dst.host ?? this.config.host})`);
-
-		if (isLocalUser(src)) {
-			// This calls createMoveJob at the end
-			await this.moveFromLocal(src, dst);
-		} else {
-			await this.queueService.createMoveJob(src, dst);
-		}
+		// Queue it up, since this is a slow process
+		this.logger.info(`Restarting migration from ${src.id} (@${src.usernameLower}@${src.host ?? this.config.host}) to ${src.movedToUri}`);
+		await this.queueService.createCheckUserMigrationJob(src.id, { allowRepeat: true });
 	}
 
 	/**
@@ -120,7 +149,11 @@ export class AccountMoveService {
 	 * After delivering Move activity, its local followers unfollow the old account and then follow the new one.
 	 */
 	@bindThis
-	public async moveFromLocal(src: MiLocalUser, dst: MiLocalUser | MiRemoteUser): Promise<Packed<'MeDetailed'>> {
+	public async moveFromLocal(src: MiLocalUser, dst: MiUser, opts?: MigrationOpts): Promise<Packed<'MeDetailed'>> {
+		// Compute this first, before we clobber src.
+		const isRepeatMigration = src.movedAt != null;
+		const silent = opts?.silent ?? isRepeatMigration;
+
 		const srcUri = this.userEntityService.getUserUri(src);
 		const dstUri = this.userEntityService.getUserUri(dst);
 
@@ -147,7 +180,7 @@ export class AccountMoveService {
 
 		// Publish meUpdated event
 		const iObj = await this.userEntityService.pack(src.id, src, { schema: 'MeDetailed', includeSecrets: true });
-		await this.globalEventService.publishMainStream(src.id, 'meUpdated', iObj);
+		if (!silent) await this.globalEventService.publishMainStream(src.id, 'meUpdated', iObj);
 
 		// Unfollow after 24 hours
 		const followings = await this.followingsRepository.findBy({
@@ -156,29 +189,42 @@ export class AccountMoveService {
 		await this.queueService.createDelayedUnfollowJob(followings.map(following => ({
 			from: { id: src.id },
 			to: { id: following.followeeId },
+			silent,
 		})), this.envService.env.NODE_ENV === 'test' ? 10000 : 1000 * 60 * 60 * 24);
 
-		await this.queueService.createMoveJob(src, dst);
+		if (opts?.immediate) {
+			await this.postMoveProcess(src, dst, { ...opts, silent });
+		} else {
+			await this.queueService.createMoveJob(src, dst, silent);
+		}
 
 		return iObj;
 	}
 
 	@bindThis
-	public async postMoveProcess(src: MiUser, dst: MiUser): Promise<void> {
+	public async postMoveProcess(src: MiUser, dst: MiUser, opts?: MigrationOpts): Promise<void> {
+		const immediate = opts?.immediate ?? false;
+		const silent = opts?.silent ?? false;
+
 		// Copy blockings and mutings, and update lists
-		await this.copyBlocking(src, dst)
+		await this.copyBlocking(src, dst, immediate, silent)
 			.catch(err => this.logger.warn(`Error copying blockings in migration ${src.id} (@${src.usernameLower}@${src.host ?? this.config.host}) to ${dst.id} (@${dst.usernameLower}@${dst.host ?? this.config.host}): ${renderInlineError(err)}`));
 		await this.copyMutings(src, dst)
 			.catch(err => this.logger.warn(`Error copying mutings in migration ${src.id} (@${src.usernameLower}@${src.host ?? this.config.host}) to ${dst.id} (@${dst.usernameLower}@${dst.host ?? this.config.host}): ${renderInlineError(err)}`));
 		await this.deleteScheduledNotes(src)
 			.catch(err => this.logger.warn(`Error deleting scheduled notes in migration ${src.id} (@${src.usernameLower}@${src.host ?? this.config.host}) to ${dst.id} (@${dst.usernameLower}@${dst.host ?? this.config.host}): ${renderInlineError(err)}`));
-		await this.copyRoles(src, dst)
+		await this.copyRoles(src, dst, silent)
 			.catch(err => this.logger.warn(`Error copying roles in migration ${src.id} (@${src.usernameLower}@${src.host ?? this.config.host}) to ${dst.id} (@${dst.usernameLower}@${dst.host ?? this.config.host}): ${renderInlineError(err)}`));
 		await this.updateLists(src, dst)
 			.catch(err => this.logger.warn(`Error updating lists in migration ${src.id} (@${src.usernameLower}@${src.host ?? this.config.host}) to ${dst.id} (@${dst.usernameLower}@${dst.host ?? this.config.host}): ${renderInlineError(err)}`));
 		await this.antennaService.onMoveAccount(src, dst)
 			.catch(err => this.logger.warn(`Error updating antennas in migration ${src.id} (@${src.usernameLower}@${src.host ?? this.config.host}) to ${dst.id} (@${dst.usernameLower}@${dst.host ?? this.config.host}): ${renderInlineError(err)}`));
+		await this.copyFollows(src, dst, immediate, silent)
+			.catch(err => this.logger.warn(`Error copying follows in migration ${src.id} (@${src.usernameLower}@${src.host ?? this.config.host}) to ${dst.id} (@${dst.usernameLower}@${dst.host ?? this.config.host}): ${renderInlineError(err)}`));
+	}
 
+	@bindThis
+	private async copyFollows(src: MiUser, dst: MiUser, immediate: boolean, silent: boolean): Promise<void> {
 		// follow the new account
 		const proxy = await this.systemAccountService.fetch('proxy');
 		const followings = await this.followingsRepository.findBy({
@@ -190,6 +236,7 @@ export class AccountMoveService {
 			from: { id: following.followerId },
 			to: { id: dst.id },
 			withReplies: following.withReplies,
+			silent,
 		})) as RelationshipJobData[];
 
 		// Decrease following count instead of unfollowing.
@@ -200,12 +247,18 @@ export class AccountMoveService {
 			this.logger.warn(`Non-fatal exception in migration from ${src.id} (@${src.usernameLower}@${src.host ?? this.config.host}) to ${dst.id} (@${dst.usernameLower}@${dst.host ?? this.config.host}): ${renderInlineError(err)}`);
 		}
 
-		// Should be queued because this can cause a number of follow per one move.
-		await this.queueService.createFollowJob(followJobs);
+		if (immediate) {
+			for (const { from, to, withReplies, silent } of followJobs) {
+				await this.userFollowingService.follow(from, to, { withReplies, silent });
+			}
+		} else {
+			// Should be queued because this can cause a number of follow per one move.
+			await this.queueService.createFollowJob(followJobs);
+		}
 	}
 
 	@bindThis
-	public async copyBlocking(src: ThinUser, dst: ThinUser): Promise<void> {
+	private async copyBlocking(src: ThinUser, dst: ThinUser, immediate: boolean, silent: boolean): Promise<void> {
 		// Followers shouldn't overlap with blockers, but the destination account, different from the blockee (i.e., old account), may have followed the local user before moving.
 		// So block the destination account here.
 		const [srcBlockers, dstBlockers, dstFollowers] = await Promise.all([
@@ -218,14 +271,21 @@ export class AccountMoveService {
 		for (const blockerId of srcBlockers) {
 			if (dstBlockers.has(blockerId)) continue; // skip if already blocked
 			if (dstFollowers.has(blockerId)) continue; // skip if already following
-			blockJobs.push({ from: { id: blockerId }, to: { id: dst.id } });
+			blockJobs.push({ from: { id: blockerId }, to: { id: dst.id }, silent });
 		}
-		// no need to unblock the old account because it may be still functional
-		await this.queueService.createBlockJob(blockJobs);
+
+		if (immediate) {
+			for (const { from, to, silent } of blockJobs) {
+				await this.userBlockingService.block(from.id, to.id, silent);
+			}
+		} else {
+			// no need to unblock the old account because it may be still functional
+			await this.queueService.createBlockJob(blockJobs);
+		}
 	}
 
 	@bindThis
-	public async copyMutings(src: ThinUser, dst: ThinUser): Promise<void> {
+	private async copyMutings(src: ThinUser, dst: ThinUser): Promise<void> {
 		// Insert new mutings with the same values except mutee
 		const oldMutings = await this.mutingsRepository.findBy([
 			{ muteeId: src.id, expiresAt: IsNull() },
@@ -263,10 +323,11 @@ export class AccountMoveService {
 
 		const arrayToInsert = Array.from(newMutings.entries()).map(entry => ({ ...entry[1], id: entry[0] }));
 		await this.mutingsRepository.insert(arrayToInsert);
+		// TODO cache sync
 	}
 
 	@bindThis
-	public async deleteScheduledNotes(src: ThinUser): Promise<void> {
+	private async deleteScheduledNotes(src: ThinUser): Promise<void> {
 		const scheduledNotes = await this.noteScheduleRepository.findBy({
 			userId: src.id,
 		}) as MiNoteSchedule[];
@@ -281,7 +342,7 @@ export class AccountMoveService {
 	}
 
 	@bindThis
-	public async copyRoles(src: ThinUser, dst: ThinUser): Promise<void> {
+	private async copyRoles(src: ThinUser, dst: ThinUser, silent: boolean): Promise<void> {
 		// Insert new roles with the same values except userId
 		// role service may have cache for roles so retrieve roles from service
 		const [oldRoleAssignments, roles] = await Promise.all([
@@ -298,7 +359,7 @@ export class AccountMoveService {
 			if (!role.preserveAssignmentOnMoveAccount) continue;
 
 			try {
-				await this.roleService.assign(dst.id, role.id, oldRoleAssignment.expiresAt);
+				await this.roleService.assign(dst.id, role.id, oldRoleAssignment.expiresAt, undefined, silent);
 			} catch (e) {
 				if (e instanceof RoleService.AlreadyAssignedError) continue;
 				throw e;
@@ -316,7 +377,7 @@ export class AccountMoveService {
 	 * @returns Promise<void>
 	 */
 	@bindThis
-	public async updateLists(src: ThinUser, dst: MiUser): Promise<void> {
+	private async updateLists(src: ThinUser, dst: MiUser): Promise<void> {
 		// Return if there is no list to be updated.
 		const [srcMemberships, dstMemberships] = await Promise.all([
 			this.cacheService.userListMembershipsCache.fetch(src.id),
@@ -390,6 +451,7 @@ export class AccountMoveService {
 	}
 
 	/**
+	 * TODO this is fucked, remove it ASAP
 	 * dstユーザーのalsoKnownAsをfetchPersonしていき、本当にmovedToUrlをdstに指定するユーザーが存在するのかを調べる
 	 *
 	 * @param dst movedToUrlを指定するユーザー
@@ -441,5 +503,192 @@ export class AccountMoveService {
 		}
 
 		return resultUser;
+	}
+
+	/**
+	 * Checks the migration chain for this user, and completes any pending migrations to/from them.
+	 * The "immediate" option is recommended, otherwise multiple runs may be required to complete a full migration chain.
+	 * @param uri URI of the user to check
+	 * @param opts standard migration options, plus an optional Resolver instance.
+	 */
+	@bindThis
+	public async checkUserMigration(uri: string, opts?: MigrationOpts & { resolver?: Resolver }): Promise<void> {
+		// Shared resolver prevents infinite migration chains
+		const resolver = opts?.resolver ?? this.apResolverService.createResolver();
+
+		// Make sure user is updated and able to migrate
+		const user = await this.fetchMigrationUser(uri, resolver, opts);
+		if (!user) return;
+
+		// Tracking list prevents recursive migration.
+		// Migration to an account is not allowed if the URI already exists in this list.
+		const movePreventUris = new Set<string>();
+
+		// Check move tree up to user.
+		// This must be first in case the user has an existing chain of prior migrations.
+		if (user.alsoKnownAs) {
+			for (const movedFromUri of user.alsoKnownAs) {
+				await this.checkUserMigrationBack(movedFromUri, user, resolver, movePreventUris, opts);
+			}
+		}
+
+		// back/forward implementations leave a "gap" in movePreventUris, so cover it during the phase transition.
+		movePreventUris.add(uri);
+
+		// Check move tree from user forward
+		if (user.movedToUri) {
+			await this.checkUserMigrationForward(user, user.movedToUri, resolver, movePreventUris, opts);
+		}
+	}
+
+	/**
+	 * Processes "backwards" migration - crawling from updated "to" to unknown "fromUri".
+	 * "to" should be up-to-date and active.
+	 */
+	private async checkUserMigrationBack(fromUri: string, to: MiUser, resolver: Resolver, movePreventUris: Set<string>, opts: MigrationOpts | undefined): Promise<void> {
+		// Fetch "from" user
+		const from = await this.fetchMigrationUser(fromUri, resolver, opts);
+		if (!from) return;
+
+		// Check (?)->from
+		if (from.alsoKnownAs) {
+			for (const uri of from.alsoKnownAs) {
+				await this.checkUserMigrationBack(uri, from, resolver, movePreventUris, opts);
+			}
+		}
+
+		// Lock from URI only after all ancestors are checked
+		movePreventUris.add(fromUri);
+
+		// Check from->to
+		await this.checkAndMigrate(from, to, movePreventUris, opts);
+	}
+
+	/**
+	 * Processes "forward" migration - crawling from updated "from" to unknown "toUri".
+	 * "from" should be up-to-date and active.
+	 */
+	@bindThis
+	private async checkUserMigrationForward(from: MiUser, toUri: string, resolver: Resolver, movePreventUris: Set<string>, opts: MigrationOpts | undefined): Promise<void> {
+		// Fetch "to" user
+		const to = await this.fetchMigrationUser(toUri, resolver, opts);
+		if (!to) return;
+
+		// Check from->to
+		await this.checkAndMigrate(from, to, movePreventUris, opts);
+
+		// Lock to URI only after destination is checked
+		movePreventUris.add(toUri);
+
+		// Check to->(?)
+		if (to.movedToUri) {
+			await this.checkUserMigrationForward(to, to.movedToUri, resolver, movePreventUris, opts);
+		}
+	}
+
+	/**
+	 * Checks if a migration is pending from "from" to "to" - and if so, processes it.
+	 * "from" and "to" should already be validated - this does not check activity, duplicate migrations, etc.
+	 * The caller is responsible for updating movePreventUris!!
+	 * @param from Account being moved from
+	 * @param to Account being moved into
+	 * @param movePreventUris URIs of all accounts that have directly or indirectly migrated to "from".
+	 * @param opts Migration options to pass to the underlying implementation
+	 */
+	@bindThis
+	private async checkAndMigrate(from: MiUser, to: MiUser, movePreventUris: Set<string>, opts: MigrationOpts | undefined): Promise<void> {
+		const fromUri = this.userEntityService.getUserUri(from);
+		const toUri = this.userEntityService.getUserUri(to);
+
+		// Skip if source does not recognize target
+		if (from.movedToUri !== toUri) {
+			return;
+		}
+
+		// Skip if target does not recognize source
+		if (!to.alsoKnownAs?.some(uri => uri === fromUri)) {
+			return;
+		}
+
+		// Skip if target already exists in the migration chain
+		if (movePreventUris.has(toUri)) {
+			return;
+		}
+
+		// Skip if source and target are the same
+		if (fromUri === toUri) {
+			return;
+		}
+
+		// Success - migrate it!
+		await this.migrateUser(from, to, opts);
+	}
+
+	@bindThis
+	private async migrateUser(from: MiUser, to: MiUser, opts: MigrationOpts | undefined): Promise<void> {
+		const movedAt = this.timeService.date;
+
+		// Mark the user as migrated *first* to prevent races with other migration chains
+		if (!await this.lockUserForMigration(from, movedAt)) {
+			this.logger.debug(`Skipping from ${from.id} (${from.uri}) to ${to.id} (${to.uri}): detection race with another task`);
+			return;
+		}
+
+		// Do the migration!
+		try {
+			if (isLocalUser(from)) {
+				await this.moveFromLocal(from, to, opts);
+			} else {
+				await this.postMoveProcess(from, to, opts);
+			}
+		} catch (err) {
+			this.logger.error(`Error migrating user from ${from.id} (${from.uri}) to ${to.id} (${to.uri}): ${renderInlineError(err)}`);
+
+			// Unlock so we can try again later
+			await this.rollbackUserMigrationLock(from, movedAt);
+		}
+	}
+
+	@bindThis
+	private async lockUserForMigration(user: MiUser, movedAt: Date): Promise<boolean> {
+		const result = await this.usersRepository.update({ id: user.id, movedAt: IsNull() }, { movedAt });
+		if (!result.affected) return false;
+
+		await this.internalEventService.emit('userUpdated', { id: user.id });
+		return true;
+	}
+
+	@bindThis
+	private async rollbackUserMigrationLock(user: MiUser, movedAt: Date): Promise<boolean> {
+		const result = await this.usersRepository.update({ id: user.id, movedAt }, { movedAt: null });
+		if (!result.affected) return false;
+
+		await this.internalEventService.emit('userUpdated', { id: user.id });
+		return true;
+	}
+
+	@bindThis
+	private async fetchMigrationUser(uri: string | null, resolver: Resolver, opts: MigrationOpts | undefined): Promise<MiUser | null> {
+		if (!uri) return null;
+
+		let user: MiUser | null = await this.apPersonService.fetchPerson(uri);
+		if (!user) {
+			// Resolve missing users
+			user = await this.apPersonService.resolvePerson(uri, resolver).catch(() => null);
+		} else if (isRemoteUser(user)) {
+			// Make sure cached remote users are updated
+			user = await this.apPersonService.ensureUpdated(user, { resolver, ignoreErrors: true, timeout: 1000 * 60 * 60 });
+		}
+
+		// Skip if not found
+		if (!user) return null;
+
+		// Skip if inactive
+		if (!this.utilityService.isActiveUser(user) && !opts?.allowInactive) return null;
+
+		// Skip if already moved (unless force-migrating)
+		if (user.movedAt && !opts?.allowRepeat) return null;
+
+		return user;
 	}
 }

@@ -379,8 +379,8 @@ export class ApRendererService {
 
 	@bindThis
 	public renderMove(
-		src: MiPartialLocalUser | MiPartialRemoteUser,
-		dst: MiPartialLocalUser | MiPartialRemoteUser,
+		src: MiPartialLocalUser | MiPartialRemoteUser | MiPartialUser,
+		dst: MiPartialLocalUser | MiPartialRemoteUser | MiPartialUser,
 	): IMove {
 		const actor = this.userEntityService.getUserUri(src);
 		const target = this.userEntityService.getUserUri(dst);

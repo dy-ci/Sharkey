@@ -87,7 +87,7 @@ export class RelationshipProcessorService {
 			this.cacheService.findUserById(job.data.from.id),
 			this.cacheService.findUserById(job.data.to.id),
 		]);
-		await this.accountMoveService.postMoveProcess(src, dst);
+		await this.accountMoveService.postMoveProcess(src, dst, { silent: job.data.silent });
 		return 'ok';
 	}
 }
