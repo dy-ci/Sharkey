@@ -22,7 +22,6 @@ import { CacheService } from '@/core/CacheService.js';
 import type { UserFollowingService } from '@/core/UserFollowingService.js';
 import { UserListService } from '@/core/UserListService.js';
 import { InternalEventService } from '@/global/InternalEventService.js';
-import { trackPromise } from '@/misc/promise-tracker.js';
 
 @Injectable()
 export class UserBlockingService implements OnModuleInit {
@@ -89,7 +88,7 @@ export class UserBlockingService implements OnModuleInit {
 
 		if (this.userEntityService.isLocalUser(blocker) && this.userEntityService.isRemoteUser(blockee)) {
 			const content = this.apRendererService.addContext(this.apRendererService.renderBlock(blocking));
-			trackPromise(this.queueService.deliver(blocker, content, blockee.inbox, false));
+			await this.queueService.deliver(blocker, content, blockee.inbox, false);
 		}
 	}
 
