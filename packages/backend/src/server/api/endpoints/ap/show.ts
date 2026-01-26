@@ -140,28 +140,25 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 	 */
 	@bindThis
 	private async fetchAny(uri: string, me: MiLocalUser | null | undefined): Promise<SchemaType<typeof meta['res']> | null> {
-		if (!this.utilityService.isFederationAllowedUri(uri)) {
-			throw new ApiError(meta.errors.federationNotAllowed);
+		// Return local cached copy, if we have one
+		const local1 = await this.fetchLocal(uri, me);
+		if (local1 !== undefined) {
+			return local1;
 		}
-
-		const local = await this.mergePack(me, ...await Promise.all([
-			this.apDbResolverService.getUserFromApId(uri),
-			this.apDbResolverService.getNoteFromApId(uri),
-		]));
-		if (local != null) return local;
 
 		// No local object found with that uri.
 		// Before we fetch, resolve the URI in case it has a cross-origin redirect or anything like that.
 		// Resolver.resolve() uses strict verification, which is overly paranoid for a user-provided lookup.
-		uri = await this.resolveCanonicalUri(uri);
-		if (!this.utilityService.isFederationAllowedUri(uri)) {
-			throw new ApiError(meta.errors.federationNotAllowed);
+		const oldUri = uri;
+		uri = await this.resolveCanonicalUri(oldUri);
+
+		// Repeat with new URL
+		if (uri !== oldUri) {
+			const local2 = await this.fetchLocal(uri, me);
+			if (local2 !== undefined) {
+				return local2;
+			}
 		}
-
-		const host = this.utilityService.extractDbHost(uri);
-
-		// local object, not found in db? fail
-		if (this.utilityService.isSelfHost(host)) return null;
 
 		// リモートから一旦オブジェクトフェッチ
 		const resolver = this.apResolverService.createResolver();
@@ -233,9 +230,37 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 	/**
 	 * Resolves an arbitrary URI to its canonical, post-redirect form.
 	 */
+	@bindThis
 	private async resolveCanonicalUri(uri: string): Promise<string> {
 		const user = await this.systemAccountService.getInstanceActor();
-		const res = await this.apRequestService.signedGet(uri, user, true);
+
+		// Return the original URL if we fail to canonicalize it.
+		const res = await this.apRequestService.signedGet(uri, user, true)
+			.catch(() => uri);
+
 		return getApId(res);
+	}
+
+	@bindThis
+	private async fetchLocal(uri: string, me: MiLocalUser | null | undefined) {
+		if (!this.utilityService.isFederationAllowedUri(uri)) {
+			throw new ApiError(meta.errors.federationNotAllowed);
+		}
+
+		const local = await this.mergePack(me, ...await Promise.all([
+			this.apDbResolverService.getUserFromApId(uri),
+			this.apDbResolverService.getNoteFromApId(uri),
+		]));
+
+		if (local != null) {
+			return local;
+		}
+
+		// local object, not found in db? fail
+		if (this.utilityService.isUriLocal(uri)) {
+			return null;
+		}
+
+		return undefined;
 	}
 }
