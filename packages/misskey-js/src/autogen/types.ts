@@ -9542,6 +9542,28 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    '/users/listenbrainz': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * users/listenbrainz
+         * @description Fetch what the user is listening to.
+         *
+         *     **Credential required**: *No*
+         */
+        post: operations['users___listenbrainz'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/users/lists/create': {
         parameters: {
             query?: never;
@@ -16347,6 +16369,7 @@ export interface operations {
                         deeplFreeInstance: string | null;
                         libreTranslateURL: string | null;
                         libreTranslateKey: string | null;
+                        listenbrainzAuthKey: string | null;
                         defaultDarkTheme: string | null;
                         defaultLightTheme: string | null;
                         defaultLike: string;
@@ -20402,6 +20425,7 @@ export interface operations {
                     deeplFreeInstance?: string | null;
                     libreTranslateURL?: string | null;
                     libreTranslateKey?: string | null;
+                    listenbrainzAuthKey?: string | null;
                     enableEmail?: boolean;
                     email?: string | null;
                     smtpSecure?: boolean;
@@ -46864,6 +46888,100 @@ export interface operations {
                         weight: number;
                     }[];
                 };
+            };
+            /** @description Client error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Authentication error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Forbidden error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description I'm Ai */
+            418: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+        };
+    };
+    users___listenbrainz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': {
+                    /** Format: misskey:id */
+                    userId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK (with results) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': {
+                        title: string;
+                        artist: string;
+                        coverArt?: string;
+                        listenbrainzUrl?: string;
+                        musicbrainzUrl?: string;
+                    };
+                };
+            };
+            /** @description OK (without any results) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Client error */
             400: {

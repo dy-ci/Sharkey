@@ -55,6 +55,18 @@ SPDX-License-Identifier: AGPL-3.0-only
 						<MkButton primary @click="save_libre">Save</MkButton>
 					</div>
 				</MkFolder>
+				
+				<MkFolder>
+					<template #label>ListenBrainz Integration</template>
+
+					<div class="_gaps_m">
+						<MkInput v-model="listenbrainzAuthKey">
+							<template #prefix><i class="ti ti-key"></i></template>
+							<template #label>ListenBrainz Auth Key</template>
+						</MkInput>
+						<MkButton primary @click="save_listenbrainz">Save</MkButton>
+					</div>
+				</MkFolder>
 			</div>
 		</FormSuspense>
 	</div>
@@ -81,6 +93,7 @@ const deeplFreeMode = ref<boolean>(false);
 const deeplFreeInstance = ref<string | null>('');
 const libreTranslateURL = ref<string | null>('');
 const libreTranslateKey = ref<string | null>('');
+const listenbrainzAuthKey = ref<string | null>('');
 
 async function init() {
 	const meta = await misskeyApi('admin/meta');
@@ -115,6 +128,14 @@ function save_libre() {
 	os.apiWithDialog('admin/update-meta', {
 		libreTranslateURL: libreTranslateURL.value,
 		libreTranslateKey: libreTranslateKey.value,
+	}).then(() => {
+		os.promiseDialog(fetchInstance(true));
+	});
+}
+
+function save_listenbrainz() {
+	os.apiWithDialog('admin/update-meta', {
+		listenbrainzAuthKey: listenbrainzAuthKey.value,
 	}).then(() => {
 		os.promiseDialog(fetchInstance(true));
 	});

@@ -45,6 +45,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 					</dd>
 				</dl>
 			</div>
+			<div v-if="listenbrainzdata" :class="$style.fields">
+				<SkListenBrainz :data="listenbrainzdata" :popup="true"/>
+			</div>
 			<div :class="$style.status">
 				<div :class="$style.statusItem">
 					<div :class="$style.statusItemLabel">{{ i18n.ts.notes }}</div>
@@ -73,6 +76,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 import { onMounted, ref } from 'vue';
 import * as Misskey from 'misskey-js';
 import MkFollowButton from '@/components/MkFollowButton.vue';
+import SkListenBrainz from '@/components/SkListenBrainz.vue';
 import { userPage } from '@/filters/user.js';
 import * as os from '@/os.js';
 import { misskeyApi } from '@/utility/misskey-api.js';
@@ -98,6 +102,7 @@ const emit = defineEmits<{
 
 const zIndex = os.claimZIndex('middle');
 const user = ref<Misskey.entities.UserDetailed | null>(null);
+const listenbrainzdata = ref();
 const top = ref(0);
 const left = ref(0);
 const error = ref(false);
@@ -117,7 +122,7 @@ async function fetchUser() {
 			Misskey.acct.parse(props.q.substring(1)) :
 			{ userId: props.q };
 
-		misskeyApi('users/show', query).then(res => {
+		await misskeyApi('users/show', query).then(res => {
 			if (!props.showing) return;
 			user.value = res;
 			error.value = false;
@@ -127,8 +132,15 @@ async function fetchUser() {
 	}
 }
 
+async function fetchListenBrainz() {
+	if (user.value?.listenbrainz) {
+		await misskeyApi('users/listenbrainz', { userId: user.value.id }).then(res => listenbrainzdata.value = res);
+		console.log(JSON.stringify(listenbrainzdata.value));
+	}
+}
+
 onMounted(() => {
-	fetchUser();
+	fetchUser().then(() => fetchListenBrainz());
 
 	const rect = props.source.getBoundingClientRect();
 	const x = Math.max(1, ((rect.left + (props.source.offsetWidth / 2)) - (300 / 2)) + window.scrollX);

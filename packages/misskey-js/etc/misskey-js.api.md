@@ -2168,6 +2168,8 @@ declare namespace entities {
         UsersGalleryPostsResponse,
         UsersGetFrequentlyRepliedUsersRequest,
         UsersGetFrequentlyRepliedUsersResponse,
+        UsersListenbrainzRequest,
+        UsersListenbrainzResponse,
         UsersListsCreateRequest,
         UsersListsCreateResponse,
         UsersListsCreateFromPublicRequest,
@@ -3888,6 +3890,12 @@ type UsersGetFrequentlyRepliedUsersRequest = operations['users___get-frequently-
 
 // @public (undocumented)
 type UsersGetFrequentlyRepliedUsersResponse = operations['users___get-frequently-replied-users']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
+type UsersListenbrainzRequest = operations['users___listenbrainz']['requestBody']['content']['application/json'];
+
+// @public (undocumented)
+type UsersListenbrainzResponse = operations['users___listenbrainz']['responses']['200']['content']['application/json'];
 
 // @public (undocumented)
 type UsersListsCreateFromPublicRequest = operations['users___lists___create-from-public']['requestBody']['content']['application/json'];

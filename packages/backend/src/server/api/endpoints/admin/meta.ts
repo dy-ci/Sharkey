@@ -473,6 +473,10 @@ export const meta = {
 				type: 'string',
 				optional: false, nullable: true,
 			},
+			listenbrainzAuthKey: {
+				type: 'string',
+				optional: false, nullable: true,
+			},
 			defaultDarkTheme: {
 				type: 'string',
 				optional: false, nullable: true,

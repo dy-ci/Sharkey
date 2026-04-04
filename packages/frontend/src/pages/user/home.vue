@@ -31,7 +31,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 								</button>
 							</div>
 						</div>
-						<ul v-if="$i && $i.id != user.id" :class="$style.infoBadges">
+						<ul v-if="$i" :class="$style.infoBadges">
 							<li v-if="user.isFollowed && user.isFollowing">{{ i18n.ts.mutuals }}</li>
 							<li v-else-if="user.isFollowing">{{ i18n.ts.following }}</li>
 							<li v-else-if="user.isFollowed">{{ i18n.ts.followsYou }}</li>
@@ -39,6 +39,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 							<li v-if="user.isRenoteMuted">{{ i18n.ts.renoteMuted }}</li>
 							<li v-if="user.isBlocking">{{ i18n.ts.blocked }}</li>
 							<li v-if="user.isBlocked && $i.isModerator">{{ i18n.ts.blockingYou }}</li>
+							<li v-if="listenbrainzdata">
+								<XListenBrainz :key="user.id" :data="listenbrainzdata"/>
+							</li>
 						</ul>
 						<div :class="$style.actions" class="actions">
 							<button :class="$style.actionsMenu" class="menu _button" @click="menu"><i class="ti ti-dots"></i></button>
@@ -149,9 +152,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 					<MkLazy>
 						<XActivity :key="user.id" :user="user" :collapsed="true"/>
 					</MkLazy>
-					<MkLazy v-if="user.listenbrainz && listenbrainzdata">
-						<XListenBrainz :key="user.id" :user="user" :collapsed="true"/>
-					</MkLazy>
 				</template>
 				<!-- <div v-if="!disableNotes">
 					<MkLazy>
@@ -187,7 +187,6 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<div v-if="!narrow" class="sub _gaps" style="container-type: inline-size;">
 			<XFiles :key="user.id" :user="user" @unfold="emit('unfoldFiles')"/>
 			<XActivity :key="user.id" :user="user"/>
-			<XListenBrainz v-if="user.listenbrainz && listenbrainzdata" :key="user.id" :user="user"/>
 		</div>
 	</div>
 	<div class="background"></div>
@@ -243,7 +242,7 @@ function calcAge(birthdate: string): number {
 
 const XFiles = defineAsyncComponent(() => import('./index.files.vue'));
 const XActivity = defineAsyncComponent(() => import('./index.activity.vue'));
-const XListenBrainz = defineAsyncComponent(() => import('./index.listenbrainz.vue'));
+const XListenBrainz = defineAsyncComponent(() => import('../../components/SkListenBrainz.vue'));
 
 const props = withDefaults(defineProps<{
 	user: Misskey.entities.UserDetailed;
@@ -293,24 +292,9 @@ const moderationNote = ref(props.user.moderationNote);
 const editModerationNote = ref(false);
 const noteview = ref<string | null>(props.user.pinnedNotes.length ? 'pinned' : null);
 
-const listenbrainzdata = ref(false);
+const listenbrainzdata = ref();
 if (props.user.listenbrainz) {
-	(async function() {
-		try {
-			const response = await window.fetch(`https://api.listenbrainz.org/1/user/${props.user.listenbrainz}/playing-now`, {
-				method: 'GET',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-			});
-			const data = await response.json();
-			if (data.payload.listens && data.payload.listens.length !== 0) {
-				listenbrainzdata.value = true;
-			}
-		} catch (err) {
-			listenbrainzdata.value = false;
-		}
-	})();
+	await misskeyApi('users/listenbrainz', { userId: props.user.id }).then((data) => listenbrainzdata.value = data);
 }
 
 const background = computed(() => {
