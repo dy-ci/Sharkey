@@ -85,7 +85,7 @@ export default function MkMfm(props: MfmProps, { emit }: { emit: SetupContext<Mf
 		const tc = tinycolor(c);
 		if (! tc.isValid()) return null;
 
-		return tc.toHex();
+		return tc.toHex8();
 	};
 
 	const useAnim = props.isAnim ?? (prefer.s.advancedMfm && prefer.s.animatedMfm);
