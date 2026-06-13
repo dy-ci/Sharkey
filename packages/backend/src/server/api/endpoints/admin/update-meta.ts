@@ -76,6 +76,11 @@ export const paramDef = {
 		cacheRemoteSensitiveFiles: { type: 'boolean' },
 		emailRequiredForSignup: { type: 'boolean' },
 		approvalRequiredForSignup: { type: 'boolean' },
+		enableLogto: { type: 'boolean' },
+		logtoIssuerUrl: { type: 'string', nullable: true },
+		logtoClientId: { type: 'string', nullable: true },
+		logtoClientSecret: { type: 'string', nullable: true },
+		disablePasswordSignup: { type: 'boolean' },
 		enableHcaptcha: { type: 'boolean' },
 		hcaptchaSiteKey: { type: 'string', nullable: true },
 		hcaptchaSecretKey: { type: 'string', nullable: true },
@@ -375,6 +380,26 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 
 			if (ps.approvalRequiredForSignup !== undefined) {
 				set.approvalRequiredForSignup = ps.approvalRequiredForSignup;
+			}
+
+			if (ps.enableLogto !== undefined) {
+				set.enableLogto = ps.enableLogto;
+			}
+
+			if (ps.logtoIssuerUrl !== undefined) {
+				set.logtoIssuerUrl = ps.logtoIssuerUrl;
+			}
+
+			if (ps.logtoClientId !== undefined) {
+				set.logtoClientId = ps.logtoClientId;
+			}
+
+			if (ps.logtoClientSecret !== undefined) {
+				set.logtoClientSecret = ps.logtoClientSecret;
+			}
+
+			if (ps.disablePasswordSignup !== undefined) {
+				set.disablePasswordSignup = ps.disablePasswordSignup;
 			}
 
 			if (ps.enableHcaptcha !== undefined) {

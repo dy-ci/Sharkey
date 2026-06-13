@@ -30,8 +30,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</div>
 		</div>
 
+		<!-- Password registration disabled -->
+		<div v-if="instance.disablePasswordSignup && instance.enableLogto" :class="$style.disabledNotice">
+			<p :class="$style.noticeText">Password registration is disabled. Please use SSO to login.</p>
+		</div>
+
 		<!-- username入力 -->
-		<form class="_gaps_s" @submit.prevent="emit('usernameSubmitted', username)">
+		<form v-if="!instance.disablePasswordSignup" class="_gaps_s" @submit.prevent="emit('usernameSubmitted', username)">
 			<MkInput v-model="username" :placeholder="i18n.ts.username" type="text" pattern="^[a-zA-Z0-9_]+$" :spellcheck="false" autocomplete="username webauthn" autofocus required data-cy-signin-username>
 				<template #prefix>@</template>
 				<template #suffix>@{{ host }}</template>
@@ -48,6 +53,16 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<i class="ti ti-device-usb" style="font-size: medium;"></i>{{ i18n.ts.signinWithPasskey }}
 			</MkButton>
 		</div>
+
+		<!-- Logto SSO -->
+		<div v-if="instance.enableLogto" :class="$style.orHr">
+			<p :class="$style.orMsg">{{ i18n.ts.or }}</p>
+		</div>
+		<div v-if="instance.enableLogto">
+			<MkButton type="button" style="margin: auto auto;" large rounded @click="loginWithLogto">
+				<i class="ph-key ph-bold" style="font-size: medium;"></i> Login with SSO
+			</MkButton>
+		</div>
 	</div>
 </div>
 </template>
@@ -61,6 +76,7 @@ import { host as configHost } from '@@/js/config.js';
 import type { OpenOnRemoteOptions } from '@/utility/please-login.js';
 import { i18n } from '@/i18n.js';
 import * as os from '@/os.js';
+import { instance } from '@/instance.js';
 
 import MkButton from '@/components/MkButton.vue';
 import MkInput from '@/components/MkInput.vue';
@@ -140,6 +156,19 @@ async function specifyHostAndOpenRemote(options: OpenOnRemoteOptions): Promise<v
 	openRemote(options, targetHost);
 }
 //#endregion
+
+async function loginWithLogto() {
+	try {
+		const result = await os.api('logto/auth');
+		window.location.href = result.url;
+	} catch (error) {
+		os.alert({
+			type: 'error',
+			title: 'Failed to initiate SSO login',
+			text: (error as Error).message,
+		});
+	}
+}
 </script>
 
 <style lang="scss" module>
@@ -208,5 +237,18 @@ async function specifyHostAndOpenRemote(options: OpenOnRemoteOptions): Promise<v
 	margin: 0;
 	left: 50%;
 	transform: translateX(-50%);
+}
+
+.disabledNotice {
+	padding: 1rem;
+	background: color-mix(in srgb, var(--MI_THEME-accent), transparent 90%);
+	border-radius: 8px;
+	margin-bottom: 1rem;
+}
+
+.noticeText {
+	color: var(--MI_THEME-accent);
+	font-weight: 500;
+	text-align: center;
 }
 </style>

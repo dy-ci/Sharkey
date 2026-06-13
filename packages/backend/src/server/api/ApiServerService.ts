@@ -19,6 +19,7 @@ import { ApiCallService } from './ApiCallService.js';
 import { SignupApiService } from './SignupApiService.js';
 import { SigninApiService } from './SigninApiService.js';
 import { SigninWithPasskeyApiService } from './SigninWithPasskeyApiService.js';
+import { LogtoApiService } from './LogtoApiService.js';
 import type { FastifyInstance, FastifyPluginOptions } from 'fastify';
 
 @Injectable()
@@ -43,6 +44,7 @@ export class ApiServerService {
 		private signupApiService: SignupApiService,
 		private signinApiService: SigninApiService,
 		private signinWithPasskeyApiService: SigninWithPasskeyApiService,
+		private logtoApiService: LogtoApiService,
 		private readonly internalEventService: InternalEventService,
 	) {
 		//this.createServer = this.createServer.bind(this);
@@ -210,6 +212,18 @@ export class ApiServerService {
 				};
 			}
 		});
+
+		// Logto OIDC endpoints
+		fastify.post('/logto/auth', (request, reply) => this.logtoApiService.auth(request, reply));
+
+		fastify.get<{
+			Querystring: {
+				code?: string;
+				state?: string;
+				error?: string;
+				error_description?: string;
+			};
+		}>('/logto/callback', (request, reply) => this.logtoApiService.callback(request, reply));
 
 		// Make sure any unknown path under /api returns HTTP 404 Not Found,
 		// because otherwise ClientServerService will return the base client HTML

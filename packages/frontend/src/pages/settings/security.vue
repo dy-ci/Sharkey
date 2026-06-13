@@ -22,6 +22,15 @@ SPDX-License-Identifier: AGPL-3.0-only
 			</FormSection>
 		</SearchMarker>
 
+		<SearchMarker :keywords="['pin', 'code', 'verification']">
+			<FormSection>
+				<template #label><SearchLabel>PIN Code</SearchLabel></template>
+				<template #description>Set a PIN code for additional verification</template>
+
+				<MkPinCodeSetup />
+			</FormSection>
+		</SearchMarker>
+
 		<X2fa/>
 
 		<SearchMarker :keywords="['shared', 'access']">
@@ -69,6 +78,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 import { computed, defineAsyncComponent, useTemplateRef } from 'vue';
 import X2fa from './2fa.vue';
 import XApps from '@/pages/settings/apps.vue';
+import MkPinCodeSetup from '@/components/MkPinCodeSetup.vue';
 import FormSection from '@/components/form/section.vue';
 import FormSlot from '@/components/form/slot.vue';
 import MkButton from '@/components/MkButton.vue';

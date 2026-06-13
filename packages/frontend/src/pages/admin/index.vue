@@ -239,6 +239,11 @@ const menuDef = computed<SuperMenuDef[]>(() => [{
 		to: '/admin/external-services',
 		active: currentPage.value?.route.name === 'external-services',
 	}, {
+		icon: 'ph-key ph-bold ph-lg',
+		text: 'Logto SSO',
+		to: '/admin/logto-settings',
+		active: currentPage.value?.route.name === 'logto-settings',
+	}, {
 		icon: 'ti ti-webhook',
 		text: 'Webhook',
 		to: '/admin/system-webhook',

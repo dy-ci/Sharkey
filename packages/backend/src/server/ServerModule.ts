@@ -32,6 +32,7 @@ import { AuthenticateService } from './api/AuthenticateService.js';
 import { SigninApiService } from './api/SigninApiService.js';
 import { SigninService } from './api/SigninService.js';
 import { SignupApiService } from './api/SignupApiService.js';
+import { LogtoApiService } from './api/LogtoApiService.js';
 import { StreamingApiServerService } from './api/StreamingApiServerService.js';
 import { OpenApiServerService } from './api/openapi/OpenApiServerService.js';
 import { ClientServerService } from './web/ClientServerService.js';
@@ -95,6 +96,7 @@ const $Imports = [
 		SigninWithPasskeyApiService,
 		SigninService,
 		SignupApiService,
+		LogtoApiService,
 		StreamingApiServerService,
 		MainChannelService,
 		AdminChannelService,

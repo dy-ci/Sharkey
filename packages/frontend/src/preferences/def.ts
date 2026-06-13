@@ -3,44 +3,49 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import * as Misskey from 'misskey-js';
-import { hemisphere } from '@@/js/intl-const.js';
-import type { Theme } from '@/theme.js';
-import type { SoundType } from '@/utility/sound.js';
-import type { Plugin } from '@/plugin.js';
-import type { DeviceKind } from '@/utility/device-kind.js';
-import type { DeckProfile } from '@/deck.js';
-import type { Pref, PreferencesDefinition } from './manager.js';
-import type { FollowingFeedState } from '@/types/following-feed.js';
-import { DEFAULT_DEVICE_KIND } from '@/utility/device-kind.js';
-import { searchEngineMap } from '@/utility/search-engine-map.js';
-import { defaultFollowingFeedState } from '@/types/following-feed.js';
-import { miLocalStorage } from '@/local-storage';
+import * as Misskey from "misskey-js";
+import { hemisphere } from "@@/js/intl-const.js";
+import type { Theme } from "@/theme.js";
+import type { SoundType } from "@/utility/sound.js";
+import type { Plugin } from "@/plugin.js";
+import type { DeviceKind } from "@/utility/device-kind.js";
+import type { DeckProfile } from "@/deck.js";
+import type { Pref, PreferencesDefinition } from "./manager.js";
+import type { FollowingFeedState } from "@/types/following-feed.js";
+import { DEFAULT_DEVICE_KIND } from "@/utility/device-kind.js";
+import { searchEngineMap } from "@/utility/search-engine-map.js";
+import { defaultFollowingFeedState } from "@/types/following-feed.js";
+import { miLocalStorage } from "@/local-storage";
 
 /** サウンド設定 */
-export type SoundStore = {
-	type: Exclude<SoundType, '_driveFile_'>;
-	volume: number;
-} | {
-	type: '_driveFile_';
+export type SoundStore =
+	| {
+			type: Exclude<SoundType, "_driveFile_">;
+			volume: number;
+	  }
+	| {
+			type: "_driveFile_";
 
-	/** ドライブのファイルID */
-	fileId: string;
+			/** ドライブのファイルID */
+			fileId: string;
 
-	/** ファイルURL（こちらが優先される） */
-	fileUrl: string;
+			/** ファイルURL（こちらが優先される） */
+			fileUrl: string;
 
-	volume: number;
-};
+			volume: number;
+	  };
 
 // NOTE: デフォルト値は他の設定の状態に依存してはならない(依存していた場合、ユーザーがその設定項目単体で「初期値にリセット」した場合不具合の原因になる)
 
 export const PREF_DEF = {
 	accounts: {
-		default: [] as [host: string, user: {
-			id: string;
-			username: string;
-		}][],
+		default: [] as [
+			host: string,
+			user: {
+				id: string;
+				username: string;
+			},
+		][],
 	},
 
 	pinnedUserLists: {
@@ -53,38 +58,50 @@ export const PREF_DEF = {
 	},
 	widgets: {
 		accountDependent: true,
-		default: [{
-			name: 'calendar',
-			id: 'a', place: 'right', data: {},
-		}, {
-			name: 'notifications',
-			id: 'b', place: 'right', data: {},
-		}, {
-			name: 'trends',
-			id: 'c', place: 'right', data: {},
-		}] as {
+		default: [
+			{
+				name: "calendar",
+				id: "a",
+				place: "right",
+				data: {},
+			},
+			{
+				name: "notifications",
+				id: "b",
+				place: "right",
+				data: {},
+			},
+			{
+				name: "trends",
+				id: "c",
+				place: "right",
+				data: {},
+			},
+		] as {
 			name: string;
 			id: string;
 			place: string | null;
 			data: Record<string, any>;
 		}[],
 	},
-	'deck.profile': {
+	"deck.profile": {
 		accountDependent: true,
 		default: null as string | null,
 	},
-	'deck.profiles': {
+	"deck.profiles": {
 		accountDependent: true,
 		default: [] as DeckProfile[],
 	},
 
 	emojiPalettes: {
 		serverDependent: true,
-		default: [{
-			id: 'a',
-			name: '',
-			emojis: ['👍', '❤️', '😆', '🤔', '😮', '🎉', '💢', '😥', '😇', '🍮'],
-		}] as {
+		default: [
+			{
+				id: "a",
+				name: "",
+				emojis: ["👍", "❤️", "😆", "🤔", "😮", "🎉", "💢", "😥", "😇", "🍮"],
+			},
+		] as {
 			id: string;
 			name: string;
 			emojis: string[];
@@ -115,13 +132,13 @@ export const PREF_DEF = {
 		default: true,
 	},
 	defaultNoteVisibility: {
-		default: 'public' as (typeof Misskey.noteVisibilities)[number],
+		default: "public" as (typeof Misskey.noteVisibilities)[number],
 	},
 	defaultNoteLocalOnly: {
 		default: false,
 	},
 	keepCw: {
-		default: true as boolean | 'prepend-re',
+		default: true as boolean | "prepend-re",
 	},
 	rememberNoteVisibility: {
 		default: false,
@@ -134,16 +151,16 @@ export const PREF_DEF = {
 	},
 	menu: {
 		default: [
-			'notifications',
-			'explore',
-			'followRequests',
-			'-',
-			'announcements',
-			'search',
-			'-',
-			'favorites',
-			'drive',
-			'achievements',
+			"notifications",
+			"explore",
+			"followRequests",
+			"-",
+			"announcements",
+			"search",
+			"-",
+			"favorites",
+			"drive",
+			"achievements",
 		],
 	},
 	statusbars: {
@@ -151,25 +168,25 @@ export const PREF_DEF = {
 			name: string;
 			id: string;
 			type: string;
-			size: 'verySmall' | 'small' | 'medium' | 'large' | 'veryLarge';
+			size: "verySmall" | "small" | "medium" | "large" | "veryLarge";
 			black: boolean;
 			props: Record<string, any>;
 		}[],
 	},
 	serverDisconnectedBehavior: {
-		default: 'disabled' as 'quiet' | 'disabled' | 'dialog',
+		default: "disabled" as "quiet" | "disabled" | "dialog",
 	},
 	nsfw: {
-		default: 'respect' as 'respect' | 'force' | 'ignore',
+		default: "respect" as "respect" | "force" | "ignore",
 	},
 	highlightSensitiveMedia: {
 		default: false,
 	},
 	animation: {
-		default: !window.matchMedia('(prefers-reduced-motion)').matches,
+		default: !window.matchMedia("(prefers-reduced-motion)").matches,
 	},
 	animatedMfm: {
-		default: !window.matchMedia('(prefers-reduced-motion)').matches,
+		default: !window.matchMedia("(prefers-reduced-motion)").matches,
 	},
 	advancedMfm: {
 		default: true,
@@ -187,19 +204,19 @@ export const PREF_DEF = {
 		default: false,
 	},
 	disableShowingAnimatedImages: {
-		default: window.matchMedia('(prefers-reduced-motion)').matches,
+		default: window.matchMedia("(prefers-reduced-motion)").matches,
 	},
 	emojiStyle: {
-		default: 'twemoji', // twemoji / fluentEmoji / native
+		default: "twemoji", // twemoji / fluentEmoji / native
 	},
 	menuStyle: {
-		default: 'auto' as 'auto' | 'popup' | 'drawer',
+		default: "auto" as "auto" | "popup" | "drawer",
 	},
 	useBlurEffectForModal: {
-		default: DEFAULT_DEVICE_KIND === 'desktop',
+		default: DEFAULT_DEVICE_KIND === "desktop",
 	},
 	useBlurEffect: {
-		default: DEFAULT_DEVICE_KIND === 'desktop',
+		default: DEFAULT_DEVICE_KIND === "desktop",
 	},
 	useStickyIcons: {
 		default: true,
@@ -220,7 +237,7 @@ export const PREF_DEF = {
 		default: false,
 	},
 	instanceTicker: {
-		default: 'remote' as 'none' | 'remote' | 'always',
+		default: "remote" as "none" | "remote" | "always",
 	},
 	emojiPickerScale: {
 		default: 2,
@@ -232,7 +249,7 @@ export const PREF_DEF = {
 		default: 3,
 	},
 	emojiPickerStyle: {
-		default: 'auto' as 'auto' | 'popup' | 'drawer',
+		default: "auto" as "auto" | "popup" | "drawer",
 	},
 	squareAvatars: {
 		default: true,
@@ -253,7 +270,7 @@ export const PREF_DEF = {
 		default: false,
 	},
 	reactionsDisplaySize: {
-		default: 'medium' as 'small' | 'medium' | 'large',
+		default: "medium" as "small" | "medium" | "large",
 	},
 	limitWidthOfReaction: {
 		default: true,
@@ -268,13 +285,17 @@ export const PREF_DEF = {
 		default: false,
 	},
 	mediaListWithOneImageAppearance: {
-		default: 'expand' as 'expand' | '16_9' | '1_1' | '2_3',
+		default: "expand" as "expand" | "16_9" | "1_1" | "2_3",
 	},
 	notificationPosition: {
-		default: 'rightBottom' as 'leftTop' | 'leftBottom' | 'rightTop' | 'rightBottom',
+		default: "rightBottom" as
+			| "leftTop"
+			| "leftBottom"
+			| "rightTop"
+			| "rightBottom",
 	},
 	notificationStackAxis: {
-		default: 'horizontal' as 'vertical' | 'horizontal',
+		default: "horizontal" as "vertical" | "horizontal",
 	},
 	enableCondensedLine: {
 		default: true,
@@ -297,7 +318,7 @@ export const PREF_DEF = {
 		} as Record<string, boolean>,
 	},
 	hemisphere: {
-		default: hemisphere as 'N' | 'S',
+		default: hemisphere as "N" | "S",
 	},
 	enableSeasonalScreenEffect: {
 		default: false,
@@ -315,13 +336,13 @@ export const PREF_DEF = {
 		default: true,
 	},
 	alwaysConfirmFollow: {
-		default: true,
+		default: false,
 	},
 	confirmWhenRevealingSensitiveMedia: {
 		default: false,
 	},
 	contextMenu: {
-		default: 'app' as 'app' | 'appWithShift' | 'native',
+		default: "app" as "app" | "appWithShift" | "native",
 	},
 	skipNoteRender: {
 		default: true,
@@ -336,7 +357,7 @@ export const PREF_DEF = {
 		default: false,
 	},
 	makeEveryTextElementsSelectable: {
-		default: DEFAULT_DEVICE_KIND === 'desktop',
+		default: DEFAULT_DEVICE_KIND === "desktop",
 	},
 	showNavbarSubButtons: {
 		default: true,
@@ -348,71 +369,71 @@ export const PREF_DEF = {
 		default: [] as Plugin[],
 	},
 
-	'sound.masterVolume': {
+	"sound.masterVolume": {
 		default: 0.3,
 	},
-	'sound.notUseSound': {
+	"sound.notUseSound": {
 		default: false,
 	},
-	'sound.useSoundOnlyWhenActive': {
+	"sound.useSoundOnlyWhenActive": {
 		default: false,
 	},
-	'sound.on.note': {
-		default: { type: 'syuilo/n-aec', volume: 0 } as SoundStore,
+	"sound.on.note": {
+		default: { type: "syuilo/n-aec", volume: 0 } as SoundStore,
 	},
-	'sound.on.noteMy': {
-		default: { type: 'syuilo/n-cea-4va', volume: 1 } as SoundStore,
+	"sound.on.noteMy": {
+		default: { type: "syuilo/n-cea-4va", volume: 1 } as SoundStore,
 	},
-	'sound.on.notification': {
-		default: { type: 'syuilo/n-ea', volume: 1 } as SoundStore,
+	"sound.on.notification": {
+		default: { type: "syuilo/n-ea", volume: 1 } as SoundStore,
 	},
-	'sound.on.reaction': {
-		default: { type: 'syuilo/bubble2', volume: 1 } as SoundStore,
+	"sound.on.reaction": {
+		default: { type: "syuilo/bubble2", volume: 1 } as SoundStore,
 	},
-	'sound.on.chatMessage': {
-		default: { type: 'syuilo/waon', volume: 1 } as SoundStore,
+	"sound.on.chatMessage": {
+		default: { type: "syuilo/waon", volume: 1 } as SoundStore,
 	},
 
-	'deck.alwaysShowMainColumn': {
+	"deck.alwaysShowMainColumn": {
 		default: true,
 	},
-	'deck.navWindow': {
+	"deck.navWindow": {
 		default: true,
 	},
-	'deck.useSimpleUiForNonRootPages': {
+	"deck.useSimpleUiForNonRootPages": {
 		default: true,
 	},
-	'deck.columnAlign': {
-		default: 'center' as 'left' | 'right' | 'center',
+	"deck.columnAlign": {
+		default: "center" as "left" | "right" | "center",
 	},
-	'deck.columnGap': {
+	"deck.columnGap": {
 		default: 6,
 	},
-	'deck.menuPosition': {
-		default: 'bottom' as 'right' | 'bottom',
+	"deck.menuPosition": {
+		default: "bottom" as "right" | "bottom",
 	},
-	'deck.navbarPosition': {
-		default: 'left' as 'left' | 'top' | 'bottom',
+	"deck.navbarPosition": {
+		default: "left" as "left" | "top" | "bottom",
 	},
-	'deck.wallpaper': {
+	"deck.wallpaper": {
 		default: null as string | null,
 	},
 
-	'chat.showSenderName': {
+	"chat.showSenderName": {
 		default: false,
 	},
-	'chat.sendOnEnter': {
+	"chat.sendOnEnter": {
 		default: false,
 	},
 
-	'game.dropAndFusion': {
+	"game.dropAndFusion": {
 		default: {
 			bgmVolume: 0.25,
 			sfxVolume: 1,
 		},
 	},
 
-	'experimental.stackingRouterView': {
+	"experimental.stackingRouterView": {
 		default: false,
 	},
 
@@ -445,7 +466,7 @@ export const PREF_DEF = {
 		default: null as string | null,
 	},
 	noteDesign: {
-		default: 'sharkey' as 'sharkey' | 'misskey',
+		default: "sharkey" as "sharkey" | "misskey",
 	},
 	notificationClickable: {
 		default: false,
@@ -472,7 +493,7 @@ export const PREF_DEF = {
 		default: false,
 	},
 	visibilityOnBoost: {
-		default: 'public' as 'public' | 'home' | 'followers',
+		default: "public" as "public" | "home" | "followers",
 	},
 	warnExternalUrl: {
 		default: true,
@@ -488,86 +509,86 @@ export const PREF_DEF = {
 	// Null means "fall back to existing value from localStorage"
 	// For all of these preferences, "null" means fall back to existing value in localStorage.
 	fontSize: {
-		default: '0',
+		default: "0",
 		needsReload: true,
-		onSet: fontSize => {
-			if (fontSize !== '0') {
-				miLocalStorage.setItem('fontSize', fontSize);
+		onSet: (fontSize) => {
+			if (fontSize !== "0") {
+				miLocalStorage.setItem("fontSize", fontSize);
 			} else {
-				miLocalStorage.removeItem('fontSize');
+				miLocalStorage.removeItem("fontSize");
 			}
 		},
-	} as Pref<'0' | '1' | '2' | '3' | 'custom'>,
+	} as Pref<"0" | "1" | "2" | "3" | "custom">,
 	customFontSize: {
 		default: 14,
 		needsReload: true,
-		onSet: customFontSize => {
+		onSet: (customFontSize) => {
 			if (customFontSize) {
-				miLocalStorage.setItem('customFontSize', customFontSize.toString());
+				miLocalStorage.setItem("customFontSize", customFontSize.toString());
 			} else {
-				miLocalStorage.removeItem('customFontSize');
+				miLocalStorage.removeItem("customFontSize");
 			}
 		},
 	} as Pref<number>,
 	useSystemFont: {
 		default: false,
 		needsReload: true,
-		onSet: useSystemFont => {
+		onSet: (useSystemFont) => {
 			if (useSystemFont) {
-				miLocalStorage.setItem('useSystemFont', 't');
+				miLocalStorage.setItem("useSystemFont", "t");
 			} else {
-				miLocalStorage.removeItem('useSystemFont');
+				miLocalStorage.removeItem("useSystemFont");
 			}
 		},
 	} as Pref<boolean>,
 	cornerRadius: {
-		default: 'sharkey',
+		default: "sharkey",
 		needsReload: true,
-		onSet: cornerRadius => {
-			if (cornerRadius === 'sharkey') {
-				miLocalStorage.removeItem('cornerRadius');
+		onSet: (cornerRadius) => {
+			if (cornerRadius === "sharkey") {
+				miLocalStorage.removeItem("cornerRadius");
 			} else {
-				miLocalStorage.setItem('cornerRadius', cornerRadius);
+				miLocalStorage.setItem("cornerRadius", cornerRadius);
 			}
 		},
-	} as Pref<'misskey' | 'sharkey'>,
+	} as Pref<"misskey" | "sharkey">,
 	lang: {
-		default: 'en-US',
+		default: "en-US",
 		needsReload: true,
-		onSet: lang => {
-			miLocalStorage.setItem('lang', lang);
-			miLocalStorage.removeItem('locale');
-			miLocalStorage.removeItem('localeVersion');
+		onSet: (lang) => {
+			miLocalStorage.setItem("lang", lang);
+			miLocalStorage.removeItem("locale");
+			miLocalStorage.removeItem("localeVersion");
 		},
 	} as Pref<string>,
 	customCss: {
-		default: '',
+		default: "",
 		needsReload: true,
-		onSet: customCss => {
+		onSet: (customCss) => {
 			if (customCss) {
-				miLocalStorage.setItem('customCss', customCss);
+				miLocalStorage.setItem("customCss", customCss);
 			} else {
-				miLocalStorage.removeItem('customCss');
+				miLocalStorage.removeItem("customCss");
 			}
 		},
 	} as Pref<string>,
 	neverShowDonationInfo: {
 		default: false,
-		onSet: neverShowDonationInfo => {
+		onSet: (neverShowDonationInfo) => {
 			if (neverShowDonationInfo) {
-				miLocalStorage.setItem('neverShowDonationInfo', 'true');
+				miLocalStorage.setItem("neverShowDonationInfo", "true");
 			} else {
-				miLocalStorage.removeItem('neverShowDonationInfo');
+				miLocalStorage.removeItem("neverShowDonationInfo");
 			}
 		},
 	} as Pref<boolean>,
 	neverShowLocalOnlyInfo: {
 		default: false,
-		onSet: neverShowLocalOnlyInfo => {
+		onSet: (neverShowLocalOnlyInfo) => {
 			if (neverShowLocalOnlyInfo) {
-				miLocalStorage.setItem('neverShowLocalOnlyInfo', 'true');
+				miLocalStorage.setItem("neverShowLocalOnlyInfo", "true");
 			} else {
-				miLocalStorage.removeItem('neverShowLocalOnlyInfo');
+				miLocalStorage.removeItem("neverShowLocalOnlyInfo");
 			}
 		},
 	} as Pref<boolean>,

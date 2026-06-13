@@ -209,6 +209,31 @@ export class MiMeta {
 	@Column('boolean', {
 		default: false,
 	})
+	public enableLogto: boolean;
+
+	@Column('varchar', {
+		length: 2048, nullable: true,
+	})
+	public logtoIssuerUrl: string | null;
+
+	@Column('varchar', {
+		length: 256, nullable: true,
+	})
+	public logtoClientId: string | null;
+
+	@Column('varchar', {
+		length: 256, nullable: true,
+	})
+	public logtoClientSecret: string | null;
+
+	@Column('boolean', {
+		default: false,
+	})
+	public disablePasswordSignup: boolean;
+
+	@Column('boolean', {
+		default: false,
+	})
 	public enableHcaptcha: boolean;
 
 	@Column('varchar', {

@@ -40,6 +40,26 @@ export const meta = {
 				type: 'boolean',
 				optional: false, nullable: false,
 			},
+			enableLogto: {
+				type: 'boolean',
+				optional: false, nullable: false,
+			},
+			logtoIssuerUrl: {
+				type: 'string',
+				optional: false, nullable: true,
+			},
+			logtoClientId: {
+				type: 'string',
+				optional: false, nullable: true,
+			},
+			logtoClientSecret: {
+				type: 'string',
+				optional: false, nullable: true,
+			},
+			disablePasswordSignup: {
+				type: 'boolean',
+				optional: false, nullable: false,
+			},
 			enableHcaptcha: {
 				type: 'boolean',
 				optional: false, nullable: false,
@@ -684,6 +704,11 @@ export default class extends Endpoint<typeof meta, typeof paramDef> { // eslint-
 				disableRegistration: instance.disableRegistration,
 				emailRequiredForSignup: instance.emailRequiredForSignup,
 				approvalRequiredForSignup: instance.approvalRequiredForSignup,
+				enableLogto: instance.enableLogto,
+				logtoIssuerUrl: instance.logtoIssuerUrl,
+				logtoClientId: instance.logtoClientId,
+				logtoClientSecret: instance.logtoClientSecret,
+				disablePasswordSignup: instance.disablePasswordSignup,
 				enableHcaptcha: instance.enableHcaptcha,
 				hcaptchaSiteKey: instance.hcaptchaSiteKey,
 				enableMcaptcha: instance.enableMcaptcha,

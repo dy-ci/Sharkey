@@ -161,6 +161,8 @@ import { ApQuestionService } from './activitypub/models/ApQuestionService.js';
 import { QueueModule } from './QueueModule.js';
 import { QueueService } from './QueueService.js';
 import { SponsorsService } from './SponsorsService.js';
+import { LogtoOidcService } from './LogtoOidcService.js';
+import { PinCodeService } from './PinCodeService.js';
 
 //#region 文字列ベースでのinjection用(循環参照対応のため)
 const $AbuseReportService: Provider = { provide: 'AbuseReportService', useExisting: AbuseReportService };
@@ -370,6 +372,8 @@ const $Imports = [
 		S3Service,
 		BunnyService,
 		SignupService,
+		LogtoOidcService,
+		PinCodeService,
 		WebAuthnService,
 		UserBlockingService,
 		CacheService,

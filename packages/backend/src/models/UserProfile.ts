@@ -159,6 +159,18 @@ export class MiUserProfile {
 	public password: string | null;
 
 	@Column('varchar', {
+		length: 256, nullable: true,
+		comment: 'The Logto subject identifier (sub claim) for OIDC integration.',
+	})
+	public logtoSub: string | null;
+
+	@Column('varchar', {
+		length: 256, nullable: true,
+		comment: 'Argon2 hash of the user PIN code for secondary verification.',
+	})
+	public pinCodeHash: string | null;
+
+	@Column('varchar', {
 		length: 8192, default: '',
 	})
 	public moderationNote: string | null;

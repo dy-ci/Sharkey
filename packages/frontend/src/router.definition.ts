@@ -203,6 +203,9 @@ export const ROUTE_DEF = [{
 	path: '/signup-complete/:code',
 	component: page(() => import('@/pages/signup-complete.vue')),
 }, {
+	path: '/logto-callback',
+	component: page(() => import('@/pages/logto-callback.vue')),
+}, {
 	path: '/unsubscribe/:user/:token',
 	component: page(() => import('@/pages/unsubscribe.vue')),
 }, {
@@ -506,6 +509,10 @@ export const ROUTE_DEF = [{
 		path: '/external-services',
 		name: 'external-services',
 		component: page(() => import('@/pages/admin/external-services.vue')),
+	}, {
+		path: '/logto-settings',
+		name: 'logto-settings',
+		component: page(() => import('@/pages/admin/logto-settings.vue')),
 	}, {
 		path: '/performance',
 		name: 'performance',
