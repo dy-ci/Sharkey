@@ -1987,6 +1987,7 @@ declare namespace entities {
         IImportNotesRequest,
         IImportNotesResponse,
         IImportUserListsRequest,
+        ILogtoReauthResponse,
         IMoveRequest,
         IMoveResponse,
         INotificationsRequest,
@@ -2015,6 +2016,7 @@ declare namespace entities {
         IRegistryScopesWithDomainResponse,
         IRegistrySetRequest,
         IRevokeTokenRequest,
+        ISetPasswordRequest,
         ISharedAccessListRequest,
         ISharedAccessListResponse,
         ISharedAccessLoginRequest,
@@ -2690,6 +2692,9 @@ type IImportNotesResponse = operations['i___import-notes']['responses']['200']['
 type IImportUserListsRequest = operations['i___import-user-lists']['requestBody']['content']['application/json'];
 
 // @public (undocumented)
+type ILogtoReauthResponse = operations['i___logto___reauth']['responses']['200']['content']['application/json'];
+
+// @public (undocumented)
 type IMoveRequest = operations['i___move']['requestBody']['content']['application/json'];
 
 // @public (undocumented)
@@ -2809,6 +2814,9 @@ type IRevokeTokenRequest = operations['i___revoke-token']['requestBody']['conten
 
 // @public (undocumented)
 function isAPIError(reason: unknown): reason is APIError;
+
+// @public (undocumented)
+type ISetPasswordRequest = operations['i___set-password']['requestBody']['content']['application/json'];
 
 // @public (undocumented)
 type ISharedAccessListRequest = operations['i___shared-access___list']['requestBody']['content']['application/json'];

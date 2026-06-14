@@ -32,7 +32,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 
 		<!-- Password registration disabled -->
 		<div v-if="instance.disablePasswordSignup && instance.enableLogto" :class="$style.disabledNotice">
-			<p :class="$style.noticeText">Password registration is disabled. Please use SSO to login.</p>
+			<p :class="$style.noticeText">{{ i18n.ts.passwordLoginDisabled }}</p>
 		</div>
 
 		<!-- username入力 -->
@@ -44,23 +44,23 @@ SPDX-License-Identifier: AGPL-3.0-only
 			<MkButton type="submit" large primary rounded style="margin: 0 auto;" data-cy-signin-page-input-continue>{{ i18n.ts.continue }} <i class="ti ti-arrow-right"></i></MkButton>
 		</form>
 
-		<!-- パスワードレスログイン -->
+		<!-- Logto SSO (primary / theme color) — shown above passkey -->
 		<div :class="$style.orHr">
 			<p :class="$style.orMsg">{{ i18n.ts.or }}</p>
 		</div>
-		<div>
-			<MkButton type="submit" style="margin: auto auto;" large rounded primary gradate @click="emit('passkeyClick', $event)">
-				<i class="ti ti-device-usb" style="font-size: medium;"></i>{{ i18n.ts.signinWithPasskey }}
+		<div v-if="instance.enableLogto">
+			<MkButton type="button" style="margin: auto auto;" large rounded primary @click="loginWithLogto">
+				<i class="ph-key ph-bold" style="font-size: medium;"></i> {{ i18n.ts.signinWithSSO }}
 			</MkButton>
 		</div>
 
-		<!-- Logto SSO -->
+		<!-- パスワードレスログイン (gradate) -->
 		<div v-if="instance.enableLogto" :class="$style.orHr">
 			<p :class="$style.orMsg">{{ i18n.ts.or }}</p>
 		</div>
-		<div v-if="instance.enableLogto">
-			<MkButton type="button" style="margin: auto auto;" large rounded @click="loginWithLogto">
-				<i class="ph-key ph-bold" style="font-size: medium;"></i> Login with SSO
+		<div>
+			<MkButton type="submit" style="margin: auto auto;" large rounded gradate @click="emit('passkeyClick', $event)">
+				<i class="ti ti-device-usb" style="font-size: medium;"></i>{{ i18n.ts.signinWithPasskey }}
 			</MkButton>
 		</div>
 	</div>
@@ -77,6 +77,7 @@ import type { OpenOnRemoteOptions } from '@/utility/please-login.js';
 import { i18n } from '@/i18n.js';
 import * as os from '@/os.js';
 import { instance } from '@/instance.js';
+import { getLogtoAuthUrl } from '@/utility/logto.js';
 
 import MkButton from '@/components/MkButton.vue';
 import MkInput from '@/components/MkInput.vue';
@@ -159,12 +160,11 @@ async function specifyHostAndOpenRemote(options: OpenOnRemoteOptions): Promise<v
 
 async function loginWithLogto() {
 	try {
-		const result = await os.api('logto/auth');
-		window.location.href = result.url;
+		window.location.href = await getLogtoAuthUrl();
 	} catch (error) {
 		os.alert({
 			type: 'error',
-			title: 'Failed to initiate SSO login',
+			title: i18n.ts.ssoLoginFailed,
 			text: (error as Error).message,
 		});
 	}

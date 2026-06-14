@@ -1099,6 +1099,10 @@ export interface Locale extends ILocale {
      */
     "changePassword": string;
     /**
+     * パスワードを設定
+     */
+    "setPassword": string;
+    /**
      * セキュリティ
      */
     "security": string;
@@ -5191,6 +5195,42 @@ export interface Locale extends ILocale {
      * パスキーでログイン
      */
     "signinWithPasskey": string;
+    /**
+     * SSOでログイン
+     */
+    "signinWithSSO": string;
+    /**
+     * SSOで登録
+     */
+    "signupWithSSO": string;
+    /**
+     * パスワードでの登録は無効になっています。SSOで登録してください。
+     */
+    "passwordSignupDisabled": string;
+    /**
+     * パスワードでのログインは無効になっています。SSOでログインしてください。
+     */
+    "passwordLoginDisabled": string;
+    /**
+     * ログイン処理中...
+     */
+    "ssoProcessingLogin": string;
+    /**
+     * アカウントを審査中です。承認され次第お知らせします。
+     */
+    "ssoAccountPendingApproval": string;
+    /**
+     * 登録を完了するには招待コードを入力してください。
+     */
+    "ssoEnterInvitationCode": string;
+    /**
+     * SSOログインに失敗しました
+     */
+    "ssoLoginFailed": string;
+    /**
+     * 再認証に失敗しました。もう一度お試しください。
+     */
+    "ssoReauthFailed": string;
     /**
      * 登録されていないパスキーです。
      */

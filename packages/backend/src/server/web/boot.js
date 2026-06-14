@@ -7,13 +7,17 @@
 
 // ブロックの中に入れないと、定義した変数がブラウザのグローバルスコープに登録されてしまい邪魔なので
 (async () => {
-	window.onerror = (e) => {
-		console.error(e);
-		renderError('SOMETHING_HAPPENED', e);
+	window.onerror = (e, _source, _lineno, _colno, error) => {
+		console.error(error ?? e);
+		// Prefer the actual Error object (5th arg) over the message string so the
+		// rendered error page can show a useful message and stack trace.
+		renderError('SOMETHING_HAPPENED', error ?? e);
 	};
 	window.onunhandledrejection = (e) => {
 		console.error(e);
-		renderError('SOMETHING_HAPPENED_IN_PROMISE', e);
+		// `e` is a PromiseRejectionEvent; its `.reason` holds the actual error.
+		// Passing the event itself only ever renders "[object PromiseRejectionEvent]".
+		renderError('SOMETHING_HAPPENED_IN_PROMISE', e.reason ?? e);
 	};
 
 	let forceError = localStorage.getItem('forceError');
@@ -237,12 +241,24 @@
 		}
 		const detailsElement = document.createElement('details');
 		detailsElement.id = 'errorInfo';
+
+		// Build a readable detail string. For Error objects, include the stack;
+		// for everything else, fall back to toString() + a safe JSON dump.
+		let detailText;
+		if (details instanceof Error) {
+			detailText = `${details.toString()}\n${details.stack ?? ''}`;
+		} else {
+			let json = '';
+			try { json = JSON.stringify(details); } catch { /* circular / non-serializable */ }
+			detailText = `${details == null ? String(details) : details.toString()} ${json}`;
+		}
+
 		detailsElement.innerHTML = `
 		<br>
 		<summary>
 			<code>ERROR CODE: ${code}</code>
 		</summary>
-		<code>${details.toString()} ${JSON.stringify(details)}</code>`;
+		<code style="white-space: pre-wrap;">${detailText}</code>`;
 		errorsElement?.appendChild(detailsElement);
 		addStyle(`
 		* {

@@ -6655,6 +6655,29 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    '/i/logto/reauth': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * i/logto/reauth
+         * @description No description provided.
+         *
+         *     **Internal Endpoint**: This endpoint is an API for the misskey mainframe and is not intended for use by third parties.
+         *     **Credential required**: *Yes*
+         */
+        post: operations['i___logto___reauth'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/i/move': {
         parameters: {
             query?: never;
@@ -7049,6 +7072,29 @@ export type paths = {
          *     **Credential required**: *Yes*
          */
         post: operations['i___revoke-token'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/i/set-password': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * i/set-password
+         * @description No description provided.
+         *
+         *     **Internal Endpoint**: This endpoint is an API for the misskey mainframe and is not intended for use by third parties.
+         *     **Credential required**: *Yes*
+         */
+        post: operations['i___set-password'];
         delete?: never;
         options?: never;
         head?: never;
@@ -10223,6 +10269,7 @@ export type components = {
             moderationNote?: string;
             twoFactorEnabled?: boolean;
             usePasswordLessLogin?: boolean;
+            hasPassword?: boolean;
             securityKeys?: boolean;
             isDeleted?: boolean;
             deletedAt?: string | null;
@@ -11675,6 +11722,8 @@ export type components = {
             enableAchievements: boolean | null;
             robotsTxt: string | null;
             enableTestcaptcha: boolean;
+            enableLogto: boolean;
+            disablePasswordSignup: boolean;
             swPublickey: string | null;
             /** @default /assets/ai.png */
             mascotImageUrl: string;
@@ -16371,6 +16420,11 @@ export interface operations {
                         cacheRemoteSensitiveFiles: boolean;
                         emailRequiredForSignup: boolean;
                         approvalRequiredForSignup: boolean;
+                        enableLogto: boolean;
+                        logtoIssuerUrl: string | null;
+                        logtoClientId: string | null;
+                        logtoClientSecret: string | null;
+                        disablePasswordSignup: boolean;
                         enableHcaptcha: boolean;
                         hcaptchaSiteKey: string | null;
                         enableMcaptcha: boolean;
@@ -20564,6 +20618,11 @@ export interface operations {
                     cacheRemoteSensitiveFiles?: boolean;
                     emailRequiredForSignup?: boolean;
                     approvalRequiredForSignup?: boolean;
+                    enableLogto?: boolean;
+                    logtoIssuerUrl?: string | null;
+                    logtoClientId?: string | null;
+                    logtoClientSecret?: string | null;
+                    disablePasswordSignup?: boolean;
                     enableHcaptcha?: boolean;
                     hcaptchaSiteKey?: string | null;
                     hcaptchaSecretKey?: string | null;
@@ -35969,6 +36028,82 @@ export interface operations {
             };
         };
     };
+    i___logto___reauth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK (with results) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': {
+                        url: string;
+                    };
+                };
+            };
+            /** @description Client error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Authentication error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Forbidden error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description I'm Ai */
+            418: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+        };
+    };
     i___move: {
         parameters: {
             query?: never;
@@ -37388,6 +37523,84 @@ export interface operations {
                     /** Format: misskey:id */
                     tokenId?: string;
                     token?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description OK (without any results) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Client error */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Authentication error */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Forbidden error */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description I'm Ai */
+            418: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['Error'];
+                };
+            };
+        };
+    };
+    'i___set-password': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': {
+                    newPassword: string;
                 };
             };
         };

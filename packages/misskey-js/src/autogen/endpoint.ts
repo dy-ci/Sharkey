@@ -438,6 +438,7 @@ import type {
 	IImportNotesRequest,
 	IImportNotesResponse,
 	IImportUserListsRequest,
+	ILogtoReauthResponse,
 	IMoveRequest,
 	IMoveResponse,
 	INotificationsRequest,
@@ -466,6 +467,7 @@ import type {
 	IRegistryScopesWithDomainResponse,
 	IRegistrySetRequest,
 	IRevokeTokenRequest,
+	ISetPasswordRequest,
 	ISharedAccessListRequest,
 	ISharedAccessListResponse,
 	ISharedAccessLoginRequest,
@@ -975,6 +977,7 @@ export type Endpoints = {
 	'i/import-muting': { req: IImportMutingRequest; res: EmptyResponse };
 	'i/import-notes': { req: IImportNotesRequest; res: IImportNotesResponse };
 	'i/import-user-lists': { req: IImportUserListsRequest; res: EmptyResponse };
+	'i/logto/reauth': { req: EmptyRequest; res: ILogtoReauthResponse };
 	'i/move': { req: IMoveRequest; res: IMoveResponse };
 	'i/notifications': { req: INotificationsRequest; res: INotificationsResponse };
 	'i/notifications-grouped': { req: INotificationsGroupedRequest; res: INotificationsGroupedResponse };
@@ -993,6 +996,7 @@ export type Endpoints = {
 	'i/registry/scopes-with-domain': { req: EmptyRequest; res: IRegistryScopesWithDomainResponse };
 	'i/registry/set': { req: IRegistrySetRequest; res: EmptyResponse };
 	'i/revoke-token': { req: IRevokeTokenRequest; res: EmptyResponse };
+	'i/set-password': { req: ISetPasswordRequest; res: EmptyResponse };
 	'i/shared-access/list': { req: ISharedAccessListRequest; res: ISharedAccessListResponse };
 	'i/shared-access/login': { req: ISharedAccessLoginRequest; res: ISharedAccessLoginResponse };
 	'i/signin-history': { req: ISigninHistoryRequest; res: ISigninHistoryResponse };

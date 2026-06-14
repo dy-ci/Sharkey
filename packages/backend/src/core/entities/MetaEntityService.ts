@@ -104,6 +104,8 @@ export class MetaEntityService {
 			enableFC: instance.enableFC,
 			fcSiteKey: instance.fcSiteKey,
 			enableTestcaptcha: instance.enableTestcaptcha,
+			enableLogto: instance.enableLogto,
+			disablePasswordSignup: instance.disablePasswordSignup,
 			swPublickey: instance.swPublicKey,
 			themeColor: instance.themeColor,
 			mascotImageUrl: instance.mascotImageUrl ?? '/assets/ai.png',

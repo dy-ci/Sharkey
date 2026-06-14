@@ -153,6 +153,14 @@ export const packedMetaLiteSchema = {
 			type: 'boolean',
 			optional: false, nullable: false,
 		},
+		enableLogto: {
+			type: 'boolean',
+			optional: false, nullable: false,
+		},
+		disablePasswordSignup: {
+			type: 'boolean',
+			optional: false, nullable: false,
+		},
 		swPublickey: {
 			type: 'string',
 			optional: false, nullable: true,

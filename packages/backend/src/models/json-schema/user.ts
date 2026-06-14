@@ -472,6 +472,10 @@ export const packedUserDetailedNotMeOnlySchema = {
 			type: 'boolean',
 			nullable: false, optional: true,
 		},
+		hasPassword: {
+			type: 'boolean',
+			nullable: false, optional: true,
+		},
 		securityKeys: {
 			type: 'boolean',
 			nullable: false, optional: true,

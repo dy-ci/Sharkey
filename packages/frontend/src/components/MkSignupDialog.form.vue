@@ -9,7 +9,18 @@ SPDX-License-Identifier: AGPL-3.0-only
 		<i class="ti ti-user-edit"></i>
 	</div>
 	<div class="_spacer" style="--MI_SPACER-min: 20px; --MI_SPACER-max: 32px;">
-		<form class="_gaps_m" autocomplete="new-password" @submit.prevent="onSubmit">
+		<!-- Logto SSO button when password signup is disabled -->
+		<div v-if="instance.disablePasswordSignup && instance.enableLogto" class="_gaps_m">
+			<div :class="$style.disabledNotice">
+				<p :class="$style.noticeText">{{ i18n.ts.passwordSignupDisabled }}</p>
+			</div>
+			<MkButton type="button" large rounded primary gradate style="margin: 0 auto;" @click="signupWithLogto">
+				<i class="ph-key ph-bold" style="font-size: medium;"></i> {{ i18n.ts.signupWithSSO }}
+			</MkButton>
+		</div>
+
+		<!-- Normal registration form -->
+		<form v-else class="_gaps_m" autocomplete="new-password" @submit.prevent="onSubmit">
 			<MkInput v-if="instance.disableRegistration" v-model="invitationCode" type="text" :spellcheck="false" required>
 				<template #label>{{ i18n.ts.invitationCode }}</template>
 				<template #prefix><i class="ti ti-key"></i></template>
@@ -97,6 +108,7 @@ import { misskeyApi } from '@/utility/misskey-api.js';
 import { instance } from '@/instance.js';
 import { i18n } from '@/i18n.js';
 import { login } from '@/accounts.js';
+import { getLogtoAuthUrl } from '@/utility/logto.js';
 
 const props = withDefaults(defineProps<{
 	autoSet?: boolean;
@@ -261,6 +273,18 @@ function onChangePasswordRetype(): void {
 	passwordRetypeState.value = password.value === retypedPassword.value ? 'match' : 'not-match';
 }
 
+async function signupWithLogto(): Promise<void> {
+	try {
+		window.location.href = await getLogtoAuthUrl();
+	} catch (error) {
+		os.alert({
+			type: 'error',
+			title: i18n.ts.ssoLoginFailed,
+			text: (error as Error).message,
+		});
+	}
+}
+
 async function onSubmit(): Promise<void> {
 	if (submitting.value) return;
 	submitting.value = true;
@@ -354,5 +378,18 @@ function onSignupApiError() {
 .root input:user-invalid {
 	outline-style: solid;
 	outline-color: var(--MI_THEME-error);
+}
+
+.disabledNotice {
+	padding: 1rem;
+	background: color-mix(in srgb, var(--MI_THEME-accent), transparent 90%);
+	border-radius: 8px;
+	margin-bottom: 1rem;
+}
+
+.noticeText {
+	color: var(--MI_THEME-accent);
+	font-weight: 500;
+	text-align: center;
 }
 </style>

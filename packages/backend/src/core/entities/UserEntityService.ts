@@ -516,6 +516,7 @@ export class UserEntityService implements OnModuleInit {
 			...(isDetailed && (isMe || iAmModerator) ? {
 				twoFactorEnabled: profile!.twoFactorEnabled,
 				usePasswordLessLogin: profile!.usePasswordLessLogin,
+				hasPassword: profile!.password != null,
 				securityKeys: profile!.twoFactorEnabled
 					// TODO make all this "exists" instead
 					? Promise.resolve(opts.hint?.securityKeyCounts?.get(user.id) ?? this.userSecurityKeysRepository.countBy({ userId: user.id })).then(result => result >= 1)

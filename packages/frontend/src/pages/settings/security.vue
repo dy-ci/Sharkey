@@ -15,19 +15,13 @@ SPDX-License-Identifier: AGPL-3.0-only
 				<template #label><SearchLabel>{{ i18n.ts.password }}</SearchLabel></template>
 
 				<SearchMarker>
-					<MkButton primary @click="change()">
+					<MkButton v-if="$i && !$i.hasPassword" primary @click="startSetPassword()">
+						<SearchLabel>{{ i18n.ts.setPassword }}</SearchLabel>
+					</MkButton>
+					<MkButton v-else primary @click="change()">
 						<SearchLabel>{{ i18n.ts.changePassword }}</SearchLabel>
 					</MkButton>
 				</SearchMarker>
-			</FormSection>
-		</SearchMarker>
-
-		<SearchMarker :keywords="['pin', 'code', 'verification']">
-			<FormSection>
-				<template #label><SearchLabel>PIN Code</SearchLabel></template>
-				<template #description>Set a PIN code for additional verification</template>
-
-				<MkPinCodeSetup />
 			</FormSection>
 		</SearchMarker>
 
@@ -75,10 +69,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 </template>
 
 <script lang="ts" setup>
-import { computed, defineAsyncComponent, useTemplateRef } from 'vue';
+import { computed, defineAsyncComponent, onMounted, useTemplateRef } from 'vue';
 import X2fa from './2fa.vue';
 import XApps from '@/pages/settings/apps.vue';
-import MkPinCodeSetup from '@/components/MkPinCodeSetup.vue';
 import FormSection from '@/components/form/section.vue';
 import FormSlot from '@/components/form/slot.vue';
 import MkButton from '@/components/MkButton.vue';
@@ -88,6 +81,8 @@ import { misskeyApi } from '@/utility/misskey-api.js';
 import { i18n } from '@/i18n.js';
 import { definePage } from '@/page.js';
 import MkFeatureBanner from '@/components/MkFeatureBanner.vue';
+import { $i } from '@/i.js';
+import { refreshCurrentAccount } from '@/accounts.js';
 
 const pagination = {
 	endpoint: 'i/signin-history' as const,
@@ -126,6 +121,68 @@ async function change() {
 		newPassword,
 	});
 }
+
+// SSO accounts have no local password. Setting a first password requires a
+// step-up re-authentication through Logto: redirect to the IdP, then the
+// backend redirects back here with ?passwordReauth=ok and we prompt for it.
+async function startSetPassword() {
+	try {
+		const { url } = await misskeyApi('i/logto/reauth', {});
+		window.location.href = url;
+	} catch (err) {
+		os.alert({
+			type: 'error',
+			title: i18n.ts.ssoLoginFailed,
+			text: (err as Error).message,
+		});
+	}
+}
+
+async function promptAndSetPassword() {
+	const { canceled, result: newPassword } = await os.inputText({
+		title: i18n.ts.newPassword,
+		type: 'password',
+		autocomplete: 'new-password',
+	});
+	if (canceled) return;
+
+	const { canceled: canceled2, result: newPassword2 } = await os.inputText({
+		title: i18n.ts.newPasswordRetype,
+		type: 'password',
+		autocomplete: 'new-password',
+	});
+	if (canceled2) return;
+
+	if (newPassword !== newPassword2) {
+		os.alert({
+			type: 'error',
+			text: i18n.ts.retypedNotMatch,
+		});
+		return;
+	}
+
+	await os.apiWithDialog('i/set-password', { newPassword });
+	await refreshCurrentAccount();
+}
+
+onMounted(() => {
+	const params = new URLSearchParams(window.location.search);
+	const reauth = params.get('passwordReauth');
+	if (!reauth) return;
+
+	// Strip the one-time query param so a refresh doesn't re-trigger the flow.
+	window.history.replaceState(null, '', window.location.pathname + window.location.hash);
+
+	if (reauth === 'ok') {
+		promptAndSetPassword();
+	} else {
+		os.alert({
+			type: 'error',
+			title: i18n.ts.ssoLoginFailed,
+			text: i18n.ts.ssoReauthFailed,
+		});
+	}
+});
 
 async function regenerateToken() {
 	const auth = await os.authenticateDialog();

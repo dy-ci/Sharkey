@@ -689,6 +689,8 @@ const $Imports = [
 		S3Service,
 		BunnyService,
 		SignupService,
+		LogtoOidcService,
+		PinCodeService,
 		WebAuthnService,
 		UserBlockingService,
 		CacheService,

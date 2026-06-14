@@ -225,6 +225,13 @@ export class ApiServerService {
 			};
 		}>('/logto/callback', (request, reply) => this.logtoApiService.callback(request, reply));
 
+		fastify.post<{
+			Body: {
+				regToken?: string;
+				invitationCode?: string;
+			};
+		}>('/logto/complete-signup', (request, reply) => this.logtoApiService.completeSignup(request, reply));
+
 		// Make sure any unknown path under /api returns HTTP 404 Not Found,
 		// because otherwise ClientServerService will return the base client HTML
 		// page with HTTP 200.

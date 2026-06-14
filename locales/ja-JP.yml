@@ -270,6 +270,7 @@ instanceFollowing: "サーバーのフォロー"
 instanceFollowers: "サーバーのフォロワー"
 instanceUsers: "サーバーのユーザー"
 changePassword: "パスワードを変更"
+setPassword: "パスワードを設定"
 security: "セキュリティ"
 retypedNotMatch: "入力が一致しません。"
 currentPassword: "現在のパスワード"
@@ -1293,6 +1294,15 @@ modified: "変更あり"
 discard: "破棄"
 thereAreNChanges: "{n}件の変更があります"
 signinWithPasskey: "パスキーでログイン"
+signinWithSSO: "Auth.yunでログイン"
+signupWithSSO: "Auth.yunで登録"
+passwordSignupDisabled: "パスワードでの登録は無効になっています。Auth.yunで登録してください。"
+passwordLoginDisabled: "パスワードでのログインは無効になっています。Auth.yunでログインしてください。"
+ssoProcessingLogin: "ログイン処理中..."
+ssoAccountPendingApproval: "アカウントを審査中です。承認され次第お知らせします。"
+ssoEnterInvitationCode: "登録を完了するには招待コードを入力してください。"
+ssoLoginFailed: "Auth.yunログインに失敗しました"
+ssoReauthFailed: "再認証に失敗しました。もう一度お試しください。"
 unknownWebAuthnKey: "登録されていないパスキーです。"
 passkeyVerificationFailed: "パスキーの検証に失敗しました。"
 passkeyVerificationSucceededButPasswordlessLoginDisabled: "パスキーの検証に成功しましたが、パスワードレスログインが無効になっています。"
@@ -1311,7 +1321,7 @@ acknowledgeNotesAndEnable: "注意事項を理解した上でオンにします�
 federationSpecified: "このサーバーはホワイトリスト連合で運用されています。管理者が指定したサーバー以外とやり取りすることはできません。"
 federationDisabled: "このサーバーは連合が無効化されています。他のサーバーのユーザーとやり取りすることはできません。"
 confirmOnReact: "リアクションする際に確認する"
-reactAreYouSure: "\" {emoji} \" をリアクションしますか？"
+reactAreYouSure: '" {emoji} " をリアクションしますか？'
 markAsSensitiveConfirm: "このメディアをセンシティブとして設定しますか？"
 unmarkAsSensitiveConfirm: "このメディアのセンシティブ指定を解除しますか？"
 preferences: "環境設定"
@@ -1803,7 +1813,7 @@ _achievements:
       description: "実績一覧を3分以上眺め続けた"
     _iLoveMisskey:
       title: "I Love Misskey"
-      description: "\"I ❤ #Misskey\"を投稿した"
+      description: '"I ❤ #Misskey"を投稿した'
       flavor: "Misskeyを使ってくださりありがとうございます！ by 開発チーム"
     _foundTreasure:
       title: "宝探し"
@@ -3019,8 +3029,8 @@ _customEmojisManager:
     _register:
       uploadSettingTitle: "アップロード設定"
       uploadSettingDescription: "この画面で絵文字アップロードを行う際の動作を設定できます。"
-      directoryToCategoryLabel: "ディレクトリ名を\"category\"に入力する"
-      directoryToCategoryCaption: "ディレクトリをドラッグ・ドロップした時に、ディレクトリ名を\"category\"に入力します。"
+      directoryToCategoryLabel: 'ディレクトリ名を"category"に入力する'
+      directoryToCategoryCaption: 'ディレクトリをドラッグ・ドロップした時に、ディレクトリ名を"category"に入力します。'
       emojiInputAreaCaption: "いずれかの方法で登録する絵文字を選択してください。"
       emojiInputAreaList1: "この枠に画像ファイルまたはディレクトリをドラッグ＆ドロップ"
       emojiInputAreaList2: "このリンクをクリックしてPCから選択する"
