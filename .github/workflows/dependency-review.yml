@@ -1,0 +1,18 @@
+# Dependency review — part of the GitHub-native equivalent of
+# .gitlab/ci_templates/dependency_scanning.yml. Blocks PRs that introduce
+# dependencies with known vulnerabilities. (Dependency *updates* and OSV alerts
+# are already handled by Renovate — see renovate.json5 — so no Dependabot.)
+name: Dependency review
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4

@@ -1,0 +1,43 @@
+# CodeQL static analysis — GitHub-native equivalent of gitlab-advanced-sast
+# (.gitlab/ci_templates/sast.yml). Runs on PRs, pushes to develop/stable, and
+# weekly. Results appear in Security → Code scanning.
+name: CodeQL
+
+on:
+  push:
+    branches:
+      - develop
+      - stable
+  pull_request:
+  schedule:
+    - cron: '23 5 * * 1'
+
+permissions:
+  security-events: write
+  actions: read
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language:
+          - javascript-typescript
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
+
+      # JS/TS is interpreted — no build step needed before analysis.
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:${{ matrix.language }}'

@@ -1,0 +1,35 @@
+# Secret detection — equivalent of .gitlab/ci_templates/secret_detection.yml.
+# Uses the gitleaks binary directly (rather than the official action) to avoid
+# the GITLEAKS_LICENSE requirement on GitHub organisations. Fails the job if a
+# secret is detected; add a .gitleaksignore or .gitleaks.toml to allowlist
+# historical false positives.
+name: Secret detection
+
+on:
+  push:
+    branches:
+      - develop
+      - stable
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag=$(curl -sSfL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r .tag_name)
+          ver=${tag#v}
+          echo "Using gitleaks ${tag}"
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/${tag}/gitleaks_${ver}_linux_x64.tar.gz" | tar -xz gitleaks
+          ./gitleaks detect --redact --verbose --exit-code 1

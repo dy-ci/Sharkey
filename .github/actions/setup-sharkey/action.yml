@@ -1,0 +1,41 @@
+# Composite action that replicates the GitLab CI `before_script` shared by the
+# build/test jobs (.gitlab-ci.yml `build` -> `before_script`).
+# Must run *after* `actions/checkout`, inside a `node:22` job container.
+name: 'Setup Sharkey'
+description: 'Install system deps, prepare CI config, enable corepack and install pnpm dependencies (frozen lockfile, cached store).'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        apt-get update
+        apt-get install -y git wget curl build-essential python3 ffmpeg libcairo2-dev libpango1.0-dev libpangocairo-1.0
+
+    - name: Prepare CI config
+      shell: bash
+      run: |
+        echo "clusterLimit: $(nproc)" >> .config/ci.yml
+        cp .config/ci.yml .config/default.yml
+        cp .config/ci.yml .config/test.yml
+
+    - name: Enable corepack
+      shell: bash
+      run: |
+        corepack enable
+        corepack install
+
+    - name: Cache pnpm store
+      uses: actions/cache@v4
+      with:
+        path: .pnpm-store
+        key: pnpm-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml') }}
+        restore-keys: |
+          pnpm-
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        pnpm config set store-dir .pnpm-store
+        pnpm install --frozen-lockfile

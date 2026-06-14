@@ -1,0 +1,172 @@
+# Build & test pipeline — GitHub Actions port of the `build`/`test` stages in
+# .gitlab-ci.yml. Runs on PRs and on pushes to develop/stable (GitLab "common" rules).
+#
+# Jobs run inside a `node:22` container so the `postgres`/`redis` service
+# containers are reachable by their label names — matching the hostnames in
+# .config/ci.yml (db.host: postgres / redis.host: redis). This lets us reuse the
+# exact same CI config as GitLab without modification.
+name: Test
+
+on:
+  push:
+    branches:
+      - develop
+      - stable
+  pull_request:
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # Path filtering, equivalent to the `changes:` rules on backend_tests /
+  # frontend_tests in .gitlab-ci.yml. On push events these jobs always run
+  # (see each job's `if`), matching GitLab where the push rule has no `changes:`.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'packages/backend/**/*'
+              - 'packages/megalodon/**/*'
+              - 'packages/misskey-js/**/*'
+              - 'packages/*'
+              - 'scripts/**/*'
+              - 'eslint/**/*'
+              - 'chart/**/*'
+              - '.config/**/*'
+            frontend:
+              - 'packages/frontend/**/*'
+              - 'packages/frontend-embed/**/*'
+              - 'packages/frontend-shared/**/*'
+              - 'packages/misskey-js/**/*'
+              - 'packages/misskey-bubble-game/**/*'
+              - 'packages/misskey-reversi/**/*'
+              - 'packages/sw/**/*'
+              - 'packages/*'
+              - 'scripts/**/*'
+              - 'eslint/**/*'
+              - 'locales/**/*'
+              - 'sharkey-locales/**/*'
+              - 'cypress/**/*'
+              - 'assets/**/*'
+
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: node:22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup-sharkey
+      - name: Build
+        run: pnpm run build
+
+  lint:
+    runs-on: ubuntu-latest
+    container:
+      image: node:22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup-sharkey
+      - name: Lint
+        run: |
+          pnpm run build-assets
+          pnpm run eslint
+
+  backend_tests:
+    needs: changes
+    if: ${{ github.event_name == 'push' || needs.changes.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    container:
+      image: node:22
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup-sharkey
+      - name: Test backend
+        run: |
+          pnpm run --filter backend build:pre
+          pnpm run --filter backend build
+          pnpm run --filter backend migrate
+          pnpm run --filter backend test
+
+  frontend_tests:
+    needs: changes
+    if: ${{ github.event_name == 'push' || needs.changes.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    container:
+      image: node:22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup-sharkey
+      - name: Test frontend
+        run: |
+          pnpm run --filter frontend build:pre
+          pnpm run --filter frontend build
+          pnpm run --filter frontend test
+
+  misskey-js_tests:
+    runs-on: ubuntu-latest
+    container:
+      image: node:22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup-sharkey
+      - name: Test misskey-js
+        run: |
+          pnpm run --filter misskey-js build
+          pnpm run --filter misskey-js test
+
+  megalodon_tests:
+    runs-on: ubuntu-latest
+    container:
+      image: node:22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/setup-sharkey
+      - name: Test megalodon
+        run: |
+          pnpm run --filter megalodon build
+          pnpm run --filter megalodon test

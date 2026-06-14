@@ -1,0 +1,163 @@
+# Multi-arch image build/push + container scan — GitHub Actions port of the
+# `deploy` stage in .gitlab-ci.yml (get_image_tag + build_image +
+# merge_image_manifests + container_scanning).
+#
+# Pushes to GitHub Container Registry (ghcr.io). Images are built natively on
+# amd64 and arm64 runners, pushed by digest, then combined into a single
+# multi-arch manifest list — the GitHub-native equivalent of the kaniko +
+# manifest-tool flow.
+name: Docker
+
+on:
+  push:
+    branches:
+      - develop
+      - stable
+    tags:
+      - '*'
+
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Prepare platform pair
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+
+      # ghcr requires a lowercase image name; the repo owner contains uppercase.
+      - name: Compute image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          provenance: false
+          outputs: type=image,name=${{ steps.image.outputs.name }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.image.outputs.name }}
+      version: ${{ steps.pkg.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Compute image name
+        id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Read package version
+        id: pkg
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Tagging logic mirrors get_image_tag: always tag with the package.json
+      # version, plus develop / latest(stable) / the git tag as appropriate.
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.name }}
+          tags: |
+            type=raw,value=${{ steps.pkg.outputs.version }}
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/stable' }}
+            type=ref,event=tag
+
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ steps.image.outputs.name }}@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ steps.image.outputs.name }}:${{ steps.pkg.outputs.version }}
+
+  # Container scanning — equivalent of .gitlab/ci_templates/container_scanning.yml.
+  # Scans the freshly-pushed multi-arch image and reports to Security → Code scanning.
+  scan:
+    needs: merge
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@v0.28.0
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          image-ref: ${{ needs.merge.outputs.image }}:${{ needs.merge.outputs.version }}
+          format: sarif
+          output: trivy-results.sarif
+          ignore-unfixed: true
+          # Report findings to the Security tab; don't fail the publish on them.
+          exit-code: '0'
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-container

@@ -1,0 +1,23 @@
+# CodeQL scan configuration. paths-ignore mirrors SAST_EXCLUDED_PATHS from
+# .gitlab-ci.yml so generated/vendored/test code is not analysed.
+name: 'Sharkey CodeQL config'
+
+paths-ignore:
+  - spec
+  - test
+  - test-d
+  - test-federation
+  - test-server
+  - tests
+  - tmp
+  - cypress
+  - coverage
+  - node_modules
+  - build
+  - built
+  - built-js
+  - '**/built'
+  - '**/*.min.js'
+  - '**/*.test.ts'
+  - packages/megalodon/lib
+  - packages/backend/test
